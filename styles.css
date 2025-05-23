@@ -1,0 +1,45 @@
+html {
+  font-size: 0.75rem;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 350px;
+  height: 100vh;
+  background: #f8f9fa;
+  border-right: 1px solid #dee2e6;
+  z-index: 1000;
+  padding: 1rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#map {
+  position: absolute;
+  left: 350px;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: calc(100vw - 350px);
+  height: 100vh;
+  z-index: 0;
+}
+
+.container.mt-5 {
+  display: none;
+}

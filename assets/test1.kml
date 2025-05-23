@@ -1,0 +1,38 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>test1.kml</name>
+    <open>1</open>
+    <Style id="styleID00001">
+      <ListStyle>
+        <listItemType>checkHideChildren</listItemType>
+      </ListStyle>
+    </Style>
+    <Style id="styleID00002">
+      <LineStyle>
+        <color>C8FF0000</color>
+      </LineStyle>
+      <PolyStyle>
+        <color>C8FF0000</color>
+        <fill>1</fill>
+      </PolyStyle>
+    </Style>
+    <Folder>
+      <name>0</name>
+      <styleUrl>#styleID00001</styleUrl>
+      <Placemark>
+        <name>Face</name>
+        <styleUrl>#styleID00002</styleUrl>
+        <Polygon>
+          <extrude>0</extrude>
+          <altitudeMode>absolute</altitudeMode>
+          <outerBoundaryIs>
+            <LinearRing>
+              <coordinates>172.55008825347034,-43.475387061003666,28.346400000000003 172.59361523874321,-43.447425871183853,180.7464 172.57779070146793,-43.4377333082131,180.7464 172.54743921736238,-43.473763914467355,28.346400000000003 172.55008825347034,-43.475387061003666,28.346400000000003</coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+        </Polygon>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>

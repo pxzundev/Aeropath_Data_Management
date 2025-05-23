@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <Style id="marker0">
+      <IconStyle>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/paddle/A.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <Style id="marker1">
+      <IconStyle>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/paddle/B.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <Style id="marker2">
+      <IconStyle>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/paddle/C.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <Style id="marker3">
+      <IconStyle>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/paddle/D.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <Style id="vssPolyStyle">
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>2</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>cc0000ff</color>
+      </PolyStyle>
+    </Style>
+    <Placemark>
+      <name>VSS Polygon</name>
+      <styleUrl>#vssPolyStyle</styleUrl>
+      <Polygon>
+        <extrude>0</extrude>
+        <altitudeMode>absolute</altitudeMode>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>172.54743921606797,-43.47376391564566,28.35 172.56526127337395,-43.43005526283771,180.75 172.58204998287545,-43.44034264917409,180.75 172.55008825241882,-43.47538706197179,28.35 172.54743921606797,-43.47376391564566,28.35</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+    <Placemark>
+      <name></name>
+      <styleUrl>#marker0</styleUrl>
+      <Point>
+        <coordinates>172.54743921606797,-43.47376391564566,28.35</coordinates>
+        <altitudeMode>absolute</altitudeMode>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name></name>
+      <styleUrl>#marker1</styleUrl>
+      <Point>
+        <coordinates>172.56526127337395,-43.43005526283771,180.75</coordinates>
+        <altitudeMode>absolute</altitudeMode>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name></name>
+      <styleUrl>#marker2</styleUrl>
+      <Point>
+        <coordinates>172.58204998287545,-43.44034264917409,180.75</coordinates>
+        <altitudeMode>absolute</altitudeMode>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name></name>
+      <styleUrl>#marker3</styleUrl>
+      <Point>
+        <coordinates>172.55008825241882,-43.47538706197179,28.35</coordinates>
+        <altitudeMode>absolute</altitudeMode>
+      </Point>
+    </Placemark>
+  </Document>
+</kml>

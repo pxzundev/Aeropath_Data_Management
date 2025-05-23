@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <Placemark>
+      <name>VSS Polygon</name>
+      <Polygon>
+        <extrude>1</extrude>
+        <altitudeMode>absolute</altitudeMode>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              172.54743921606797,-43.47376391564566,28.35 172.57779069537156,-43.437733307341816,180.75 172.59361714014406,-43.447427036197396,180.75 172.55008825241882,-43.47538706197179,28.35 172.54743921606797,-43.47376391564566,28.35
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>
