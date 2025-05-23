@@ -577,7 +577,7 @@ if (depOisFormSafety) {
 // Add event listener for Export KML button
 const exportBtn = document.getElementById("export-kml");
 if (exportBtn) {
-  exportBtn.addEventListener("click", function () {
+  exportBtn.addEventListener("click", async function () {
     if (!window.lastVssPoly3D) {
       // Use SweetAlert2 for error if VSS polygon is missing
       if (window.Swal) {
@@ -609,17 +609,87 @@ if (exportBtn) {
       return;
     }
     const kml = vssToKML(window.lastVssPoly3D);
-    const blob = new Blob([kml], {
-      type: "application/vnd.google-earth.kml+xml",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "vss.kml";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Determine ICAO and THR designator for filename
+    let icao = "";
+    let thr = "";
+    const icaoEl = document.getElementById("aerodrome");
+    if (icaoEl) icao = icaoEl.value.trim();
+    const thrEl = document.getElementById("runwaythr");
+    if (thrEl) {
+      // Extract only the runway number and the last letter (if any)
+      // Examples: 'THR 05G' -> '05G', 'THR 05' -> '05', 'THR 23L' -> '23L', 'THR 23' -> '23'
+      const raw = thrEl.value.trim();
+      const match = raw.match(/(\d{2})([A-Z])?$/i);
+      if (match) {
+        thr = match[1] + (match[2] ? match[2].toUpperCase() : "");
+      }
+    }
+    let defaultFileName = "vss.kml";
+    if (icao && thr) {
+      defaultFileName = `${icao}-RWY${thr}`;
+    } else if (icao) {
+      defaultFileName = `${icao}-RWY`;
+    }
+    defaultFileName += ".kml";
+    // Use File System Access API if available
+    if (window.showSaveFilePicker) {
+      try {
+        const opts = {
+          suggestedName: defaultFileName,
+          types: [
+            {
+              description: "KML Files",
+              accept: { "application/vnd.google-earth.kml+xml": [".kml"] },
+            },
+          ],
+        };
+        const handle = await window.showSaveFilePicker(opts);
+        const writable = await handle.createWritable();
+        await writable.write(kml);
+        await writable.close();
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          if (window.Swal) {
+            Swal.fire({
+              icon: "error",
+              title: "Export Error",
+              text: "Failed to save KML file.",
+              confirmButtonColor: "#0d6efd",
+              background: "#fff",
+              color: "#212529",
+            });
+          } else {
+            const script = document.createElement("script");
+            script.src =
+              "https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js";
+            script.onload = function () {
+              Swal.fire({
+                icon: "error",
+                title: "Export Error",
+                text: "Failed to save KML file.",
+                confirmButtonColor: "#0d6efd",
+                background: "#fff",
+                color: "#212529",
+              });
+            };
+            document.head.appendChild(script);
+          }
+        }
+      }
+    } else {
+      // Fallback: Blob download
+      const blob = new Blob([kml], {
+        type: "application/vnd.google-earth.kml+xml",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = defaultFileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   });
 }
 
