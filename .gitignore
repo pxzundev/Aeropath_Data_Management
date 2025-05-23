@@ -1,0 +1,29 @@
+# Ignore macOS system files
+.DS_Store
+
+# Ignore node_modules and npm logs (if ever used)
+node_modules/
+npm-debug.log*
+
+# Ignore Python cache and virtualenvs (if used for local server)
+__pycache__/
+*.pyc
+env/
+venv/
+
+# Ignore VSCode settings
+.vscode/
+
+# Ignore log files
+*.log
+
+# Ignore exported KML files (if generated in root)
+*.kml
+
+# Ignore OS/backup files
+*~
+*.swp
+*.bak
+
+# Ignore static server artifacts
+staticfiles/
