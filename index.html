@@ -10,288 +10,255 @@
   <link rel="stylesheet" href="static/ruler/leaflet-ruler.css" />
   <link rel="stylesheet" href="styles.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
-  <link rel="icon" type="image/png" href="static/images/aeropath.png">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
   <script src="static/ruler/leaflet-ruler.js"></script>
 </head>
 
 <body>
-  <div class="sidebar d-flex flex-column" style="height: 100vh;">
-    <div class="flex-grow-1">
-      <div class="mb-4">
-        <h5 class="d-flex justify-content-between align-items-center">
-          <span class="d-flex align-items-center">
-            <img src="static/images/aeropath.png" alt="Aeropath Logo" style="height:1.7em; margin-right:0.5em;">
-            Data Manager KMLGen
-          </span>
-          <span class="badge text-bg-secondary">v0.0.1</span>
-        </h5>
-        <hr />
-      </div>
-      <div class="card mb-4">
-        <h5 class="card-header">General</h5>
-        <div class="card-body">
-          <div class="mb-4 d-flex align-items-center">
-            <div class="flex-grow-1 me-2">
-              <label for="aerodrome-search" class="form-label">Aerodrome</label>
-              <div class="position-relative">
-                <input type="text" class="form-control pe-5" id="aerodrome-search" placeholder="Search aerodrome..."
-                  autocomplete="off">
-                <button type="button" id="aerodrome-search-clear"
-                  class="btn btn-sm btn-link position-absolute end-0 top-50 translate-middle-y px-2 py-0"
-                  style="z-index:2; display:none;" tabindex="-1" aria-label="Clear search">
-                  <i class="bi bi-x"></i>
-                </button>
-              </div>
-              <select class="form-select d-none" id="aerodrome">
-                <option value="">Select Aerodrome</option>
-                <!-- Dynamically populated -->
-              </select>
-              <div class="dropdown position-relative w-100">
-                <ul class="dropdown-menu w-100" id="aerodrome-search-dropdown"
-                  style="max-height:200px; overflow-y:auto;">
-                </ul>
-              </div>
-            </div>
-            <div class="align-self-end mb-1">
-              <button id="refresh-aerodrome" type="button" class="btn btn-secondary btn-sm"
-                title="Refresh Aerodrome List">
-                <i class="bi bi-arrow-clockwise"></i>
-              </button>
-            </div>
-          </div>
-          <div class="mb-2">
-            <label for="surface-type" class="form-label">Surface</label>
-            <select class="form-select" id="surface-type">
-              <option value="vss">VSS</option>
-              <option value="dep_ois">DEP OIS</option>
+  <div class="sidebar">
+    <div class="card mb-4">
+      <h5 class="card-header">General</h5>
+      <div class="card-body">
+        <div class="mb-4 d-flex align-items-center">
+          <div class="flex-grow-1 me-2">
+            <label for="aerodrome" class="form-label">Aerodrome</label>
+            <select class="form-select" id="aerodrome">
+              <option value="">Select Aerodrome</option>
+              <!-- Add more aerodromes as needed -->
             </select>
           </div>
-        </div>
-      </div>
-
-
-      <!-- #region VSS Form Component Start -->
-      <div class="card" id="vss-form-card">
-        <h5 class="card-header d-flex justify-content-between align-items-center">VSS
-          <span id="vss-toggle-hidden-fields" role="button" tabindex="0" title="Show/hide hidden fields">
-            <i class="bi bi-eye-slash"></i>
-          </span>
-        </h5>
-        <div class="card-body">
-          <div id="vss-form-component">
-            <form id="vss-form">
-              <div class="row mb-3">
-                <div class="col-6">
-                  <label for="runwaythr" class="form-label">Runway THR</label>
-                  <select class="form-select" id="runwaythr">
-                    <option value="">THR</option>
-                  </select>
-                </div>
-                <div class="col-6">
-                  <label for="runwayend" class="form-label">Runway End</label>
-                  <select class="form-select" id="runwayend">
-                    <option value="">END</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="row mb-3" hidden>
-                <div class="col-4">
-                  <label for="thr-lat" class="form-label">THR Lat</label>
-                  <input type="number" step="any" class="form-control" disabled id="thr-lat" value="">
-                </div>
-                <div class="col-4">
-                  <label for="thr-lng" class="form-label">THR Lng</label>
-                  <input type="number" step="any" class="form-control" disabled id="thr-lng" value="">
-                </div>
-                <div class="col-4">
-                  <label for="rwyelev" class="form-label">Elev (m)</label>
-                  <input type="number" step="any" class="form-control" disabled id="rwyelev" value="">
-                </div>
-              </div>
-
-              <div class="row mb-3" hidden>
-                <div class="col-4">
-                  <label for="rwyend-lat" class="form-label">END Lat</label>
-                  <input type="number" step="any" class="form-control" disabled id="rwyend-lat" value="">
-                </div>
-                <div class="col-4">
-                  <label for="rwyend-lng" class="form-label">END Lng</label>
-                  <input type="number" step="any" class="form-control" disabled id="rwyend-lng" value="">
-                </div>
-                <div class="col-4">
-                  <label for="rwyelev" class="form-label">Elev (m)</label>
-                  <input type="number" step="any" class="form-control" disabled id="rwyendelev" value="">
-                </div>
-                <div class="col-4">
-                  <label for="fac" class="form-label">RWY Bearing (deg T)</label>
-                  <input type="number" step="any" class="form-control" disabled id="fac" value=""
-                    data-bs-toggle="tooltip"
-                    title="Calculated runway bearing. This value may be different from what is on the chart">
-                </div>
-              </div>
-
-              <div class="row mb-3">
-                <div class="col-6">
-                  <label for="vpa" class="form-label">VPA (deg)</label>
-                  <input type="number" step="any" class="form-control" id="vpa" value="3.0">
-                </div>
-                <div class="col-6">
-                  <label for="och" class="form-label">OCH (ft)</label>
-                  <input type="number" step="any" class="form-control" id="och" value="500" data-bs-toggle="tooltip"
-                    title="Use the highest OCH">
-                </div>
-              </div>
-
-              <div class="row mb-3">
-                <div class="col-6">
-                  <label for="runwaycode" class="form-label">Code</label>
-                  <select class="form-select" id="runwaycode">
-                    <option value="">1, 2</option>
-                    <option value="3,4" selected>3, 4</option>
-                  </select>
-                </div>
-                <div class="col-6">
-                  <label for="strip" class="form-label">Strip Width (m)</label>
-                  <input type="number" step="any" class="form-control" id="strip" value="280">
-                </div>
-              </div>
-
-              <div class="row mb-4">
-
-                <div class="col-6">
-                  <label for="fac" class="form-label">Offset (deg)</label>
-                  <input type="number" step="any" class="form-control" id="offsetangle" value="0"
-                    data-bs-toggle="tooltip"
-                    title="Offset angle in degrees (negative value is offset left, positive value is offset right)">
-                </div>
-              </div>
-
-              <div class="row mb-3">
-
-                <div class="col-4">
-                  <button type="submit" class="btn btn-primary w-100">Draw VSS</button>
-                </div>
-                <div class="col-4">
-                  <button type="button" class="btn btn-secondary w-100" id="export-kml">Export
-                    KML</button>
-                </div>
-                <div class="col-4">
-                  <button type="button" class="btn btn-danger w-100">Clear</button>
-                </div>
-              </div>
-
-            </form>
-          </div>
-
-        </div>
-      </div>
-
-
-      <!-- #endregion VSS Form Component End -->
-
-      <!-- #region DEP OIS Form Component Start -->
-      <div class="card d-none" id="dep-ois-form-card">
-        <h5 class="card-header">DEP OIS</h5>
-        <div class="card-body">
-          <div id="dep-ois-form-component">
-            <form id="dep-ois-form">
-              <div class="row mb-3">
-                <div class="col-6">
-                  <label for="dep-startrwy" class="form-label">RWY Start</label>
-                  <select class="form-select" id="dep-startrwy">
-                    <option value="">START</option>
-                  </select>
-                </div>
-                <div class="col-6">
-                  <label for="dep-rwythr" class="form-label">RWY End</label>
-                  <select class="form-select" id="dep-rwythr">
-                    <option value="">END</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="row mb-3" hidden>
-                <div class="col-4">
-                  <label for="dep-start-lat" class="form-label">START Lat</label>
-                  <input type="number" step="any" class="form-control" disabled id="dep-start-lat" value="">
-                </div>
-                <div class="col-4">
-                  <label for="dep-start-lng" class="form-label">START Lng</label>
-                  <input type="number" step="any" class="form-control" disabled id="dep-start-lng" value="">
-                </div>
-                <div class="col-4">
-                  <label for="dep-start-elev" class="form-label">Elev (m)</label>
-                  <input type="number" step="any" class="form-control" disabled id="dep-start-elev" value="">
-                </div>
-              </div>
-
-              <div class="row mb-3" hidden>
-                <div class="col-4">
-                  <label for="dep-end-lat" class="form-label">END Lat</label>
-                  <input type="number" step="any" class="form-control" disabled id="dep-end-lat" value="">
-                </div>
-                <div class="col-4">
-                  <label for="dep-end-lng" class="form-label">END Lng</label>
-                  <input type="number" step="any" class="form-control" disabled id="dep-end-lng" value="">
-                </div>
-                <div class="col-4">
-                  <label for="dep-end-elev" class="form-label">Elev (m)</label>
-                  <input type="number" step="any" class="form-control" disabled id="dep-end-elev" value="">
-                </div>
-              </div>
-
-
-              <div class="row mb-3">
-                <div class="col-4">
-                  <label for="cwy-length" class="form-label">CWY Length</label>
-                  <input type="number" step="any" class="form-control" id="cwy-length" value="0">
-                </div>
-
-                <!-- <div class="col-4">
-                  <label for="dep-type" class="form-label">Type</label>
-                  <select class="form-select" id="dep-type">
-                    <option value="straight">Straight</option>
-                    <option value="turning">Turning</option>
-                  </select>
-                </div> -->
-                <div class="col-4">
-                  <label for="dep-offset" class="form-label">Offset (deg)</label>
-                  <input type="number" step="any" class="form-control" id="dep-offset" value="0">
-                </div>
-
-              </div>
-              <div class="row mb-3">
-                <div class="col-4">
-                  <button type="submit" class="btn btn-primary w-100">Draw OIS</button>
-                </div>
-                <div class="col-4">
-                  <button type="button" class="btn btn-secondary w-100" id="dep-export-kml">Export
-                    KML</button>
-                </div>
-                <div class="col-4">
-                  <button type="button" class="btn btn-danger w-100" id="dep-clear">Clear</button>
-                </div>
-              </div>
-            </form>
+          <div class="align-self-end mb-1">
+            <button id="refresh-aerodrome" type="button" class="btn btn-secondary btn-sm"
+              title="Refresh Aerodrome List">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
           </div>
         </div>
+        <div class="mb-2">
+          <label for="surface-type" class="form-label">Surface</label>
+          <select class="form-select" id="surface-type">
+            <option value="vss">VSS</option>
+            <option value="dep_ois">DEP OIS</option>
+          </select>
+        </div>
       </div>
-      <!-- #endregion DEP OIS Form Component End -->
     </div>
-    <div class="sticky-bottom w-100" style="background:inherit;">
-      <hr class="my-2" style="margin-bottom:0.2rem;" />
-      <div class="text-smaller text-muted" style="font-size: 0.85rem; text-align: center;">
-        Copyright &copy; 2025 <a href="https://aeropath.aero" target="_blank">Aeropath</a>
+
+
+    <!-- #region VSS Form Component Start -->
+    <div class="card" id="vss-form-card">
+      <h5 class="card-header d-flex justify-content-between align-items-center">VSS
+        <span id="vss-toggle-hidden-fields" role="button" tabindex="0" title="Show/hide hidden fields">
+          <i class="bi bi-eye-slash"></i>
+        </span>
+      </h5>
+      <div class="card-body">
+        <div id="vss-form-component">
+          <form id="vss-form">
+            <div class="row mb-3">
+              <div class="col-6">
+                <label for="runwaythr" class="form-label">Runway THR</label>
+                <select class="form-select" id="runwaythr">
+                  <option value="">THR</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label for="runwayend" class="form-label">Runway End</label>
+                <select class="form-select" id="runwayend">
+                  <option value="">END</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row mb-3" hidden>
+              <div class="col-4">
+                <label for="thr-lat" class="form-label">THR Lat</label>
+                <input type="number" step="any" class="form-control" disabled id="thr-lat" value="">
+              </div>
+              <div class="col-4">
+                <label for="thr-lng" class="form-label">THR Lng</label>
+                <input type="number" step="any" class="form-control" disabled id="thr-lng" value="">
+              </div>
+              <div class="col-4">
+                <label for="rwyelev" class="form-label">Elev (m)</label>
+                <input type="number" step="any" class="form-control" disabled id="rwyelev" value="">
+              </div>
+            </div>
+
+            <div class="row mb-3" hidden>
+              <div class="col-4">
+                <label for="rwyend-lat" class="form-label">END Lat</label>
+                <input type="number" step="any" class="form-control" disabled id="rwyend-lat" value="">
+              </div>
+              <div class="col-4">
+                <label for="rwyend-lng" class="form-label">END Lng</label>
+                <input type="number" step="any" class="form-control" disabled id="rwyend-lng" value="">
+              </div>
+              <div class="col-4">
+                <label for="rwyelev" class="form-label">Elev (m)</label>
+                <input type="number" step="any" class="form-control" disabled id="rwyendelev" value="">
+              </div>
+              <div class="col-4">
+                <label for="fac" class="form-label">RWY Bearing (deg T)</label>
+                <input type="number" step="any" class="form-control" disabled id="fac" value="" data-bs-toggle="tooltip"
+                  title="Calculated runway bearing. This value may be different from what is on the chart">
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-6">
+                <label for="vpa" class="form-label">VPA (deg)</label>
+                <input type="number" step="any" class="form-control" id="vpa" value="3.0">
+              </div>
+              <div class="col-6">
+                <label for="och" class="form-label">OCH (ft)</label>
+                <input type="number" step="any" class="form-control" id="och" value="500" data-bs-toggle="tooltip"
+                  title="Use the highest OCH">
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-6">
+                <label for="runwaycode" class="form-label">Code</label>
+                <select class="form-select" id="runwaycode">
+                  <option value="">1, 2</option>
+                  <option value="3,4" selected>3, 4</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label for="strip" class="form-label">Strip Width (m)</label>
+                <input type="number" step="any" class="form-control" id="strip" value="280">
+              </div>
+            </div>
+
+            <div class="row mb-4">
+
+              <div class="col-6">
+                <label for="fac" class="form-label">Offset (deg)</label>
+                <input type="number" step="any" class="form-control" id="offsetangle" value="0" data-bs-toggle="tooltip"
+                  title="Offset angle in degrees (negative value is offset left, positive value is offset right)">
+              </div>
+            </div>
+
+            <div class="row mb-3">
+
+              <div class="col-4">
+                <button type="submit" class="btn btn-primary w-100">Draw VSS</button>
+              </div>
+              <div class="col-4">
+                <button type="button" class="btn btn-secondary w-100" id="export-kml">Export
+                  KML</button>
+              </div>
+              <div class="col-4">
+                <button type="button" class="btn btn-danger w-100">Clear</button>
+              </div>
+            </div>
+
+          </form>
+        </div>
+
       </div>
     </div>
+
+
+    <!-- #endregion VSS Form Component End -->
+
+    <!-- #region DEP OIS Form Component Start -->
+    <div class="card d-none" id="dep-ois-form-card">
+      <h5 class="card-header">DEP OIS</h5>
+      <div class="card-body">
+        <div id="dep-ois-form-component">
+          <form id="dep-ois-form">
+            <div class="row mb-3">
+              <div class="col-6">
+                <label for="dep-startrwy" class="form-label">RWY Start</label>
+                <select class="form-select" id="dep-startrwy">
+                  <option value="">START</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label for="dep-rwythr" class="form-label">RWY End</label>
+                <select class="form-select" id="dep-rwythr">
+                  <option value="">END</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row mb-3" hidden>
+              <div class="col-4">
+                <label for="dep-start-lat" class="form-label">START Lat</label>
+                <input type="number" step="any" class="form-control" disabled id="dep-start-lat" value="">
+              </div>
+              <div class="col-4">
+                <label for="dep-start-lng" class="form-label">START Lng</label>
+                <input type="number" step="any" class="form-control" disabled id="dep-start-lng" value="">
+              </div>
+              <div class="col-4">
+                <label for="dep-start-elev" class="form-label">Elev (m)</label>
+                <input type="number" step="any" class="form-control" disabled id="dep-start-elev" value="">
+              </div>
+            </div>
+
+            <div class="row mb-3" hidden>
+              <div class="col-4">
+                <label for="dep-end-lat" class="form-label">END Lat</label>
+                <input type="number" step="any" class="form-control" disabled id="dep-end-lat" value="">
+              </div>
+              <div class="col-4">
+                <label for="dep-end-lng" class="form-label">END Lng</label>
+                <input type="number" step="any" class="form-control" disabled id="dep-end-lng" value="">
+              </div>
+              <div class="col-4">
+                <label for="dep-end-elev" class="form-label">Elev (m)</label>
+                <input type="number" step="any" class="form-control" disabled id="dep-end-elev" value="">
+              </div>
+            </div>
+
+
+            <div class="row mb-3">
+              <div class="col-4">
+                <label for="cwy-length" class="form-label">CWY Length</label>
+                <input type="number" step="any" class="form-control" id="cwy-length" value="0">
+              </div>
+
+              <!-- <div class="col-4">
+                <label for="dep-type" class="form-label">Type</label>
+                <select class="form-select" id="dep-type">
+                  <option value="straight">Straight</option>
+                  <option value="turning">Turning</option>
+                </select>
+              </div> -->
+              <div class="col-4">
+                <label for="dep-offset" class="form-label">Offset (deg)</label>
+                <input type="number" step="any" class="form-control" id="dep-offset" value="0">
+              </div>
+
+            </div>
+            <div class="row mb-3">
+              <div class="col-4">
+                <button type="submit" class="btn btn-primary w-100">Draw OIS</button>
+              </div>
+              <div class="col-4">
+                <button type="button" class="btn btn-secondary w-100" id="dep-export-kml">Export
+                  KML</button>
+              </div>
+              <div class="col-4">
+                <button type="button" class="btn btn-danger w-100" id="dep-clear">Clear</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <!-- #endregion DEP OIS Form Component End -->
   </div>
 
   <div id="map"></div>
   <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
   <script src="static/ruler/leaflet-ruler.js"></script>
+  <script src="map.js"></script>
   <script src="main.js"></script>
+  <script src="datamgr.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     let aerodromeRunways = {};
@@ -317,8 +284,6 @@
           opt.textContent = icao;
           select.appendChild(opt);
         }
-        // Log loaded aerodromes on start
-        // console.log('Aerodromes loaded:', allAerodromes);
       } catch (e) {
         const opt = document.createElement('option');
         opt.value = '';
@@ -482,174 +447,9 @@
       }
     }
     surfaceTypeSelect.addEventListener('change', updateFormVisibility);
+    window.addEventListener('DOMContentLoaded', updateFormVisibility);
 
-    document.addEventListener('DOMContentLoaded', async function () {
-      await populateAerodromeSelect();
-      updateFormVisibility();
-      // --- Searchable Aerodrome Dropdown ---
-      const searchInput = document.getElementById('aerodrome-search');
-      const clearBtn = document.getElementById('aerodrome-search-clear');
-      const dropdown = document.getElementById('aerodrome-search-dropdown');
-      const select = document.getElementById('aerodrome');
-      let allAerodromesList = Array.from(select.options)
-        .map(opt => opt.value)
-        .filter(v => v && v !== '');
-
-      function populateDropdown(filter = '', show = true) {
-        dropdown.innerHTML = '';
-        let items = allAerodromesList;
-        if (filter) {
-          items = items.filter(icao => icao.toLowerCase().includes(filter.toLowerCase()));
-        }
-        if (items.length === 0) {
-          const li = document.createElement('li');
-          li.className = 'dropdown-item disabled';
-          li.textContent = 'No match';
-          dropdown.appendChild(li);
-        } else {
-          items.forEach(icao => {
-            const li = document.createElement('li');
-            li.className = 'dropdown-item';
-            li.textContent = icao;
-            li.tabIndex = 0;
-            li.addEventListener('mousedown', function (e) {
-              e.preventDefault();
-              select.value = icao;
-              select.dispatchEvent(new Event('change'));
-              searchInput.value = icao;
-              dropdown.classList.remove('show');
-            });
-            dropdown.appendChild(li);
-          });
-        }
-        if (show && items.length > 0) dropdown.classList.add('show');
-        else dropdown.classList.remove('show');
-      }
-
-      // When aerodrome list is repopulated, update the search list
-      if (window.populateAerodromeSelect) {
-        const origPopulate = window.populateAerodromeSelect;
-        window.populateAerodromeSelect = async function () {
-          await origPopulate();
-          allAerodromesList = Array.from(select.options)
-            .map(opt => opt.value)
-            .filter(v => v && v !== '');
-          populateDropdown(searchInput.value, false); // Don't show dropdown on refresh
-        };
-      }
-
-      populateDropdown(searchInput.value, false); // Don't show dropdown on startup
-
-      searchInput.addEventListener('input', function () {
-        populateDropdown(this.value, true);
-        dropdown.classList.add('show');
-      });
-      searchInput.addEventListener('focus', function () {
-        populateDropdown(this.value, true);
-        dropdown.classList.add('show');
-      });
-      searchInput.addEventListener('blur', function () {
-        setTimeout(() => dropdown.classList.remove('show'), 150);
-      });
-
-      select.addEventListener('change', function () {
-        if (select.value) searchInput.value = select.value;
-        updateClearBtn(); // Ensure clear button is shown/hidden after selection
-      });
-
-      // Show/hide clear button
-      function updateClearBtn() {
-        clearBtn.style.display = searchInput.value ? 'block' : 'none';
-      }
-      searchInput.addEventListener('input', updateClearBtn);
-      searchInput.addEventListener('focus', updateClearBtn);
-      searchInput.addEventListener('blur', updateClearBtn);
-      clearBtn.addEventListener('mousedown', function (e) {
-        e.preventDefault();
-        searchInput.value = '';
-        searchInput.dispatchEvent(new Event('input'));
-        // Do not open the dropdown when clearing
-        dropdown.classList.remove('show');
-        searchInput.focus();
-        // Clear markers, lines, and polygons on the map
-        if (window.runwayMarkers && window.runwayMarkers.length && window.map) {
-          window.runwayMarkers.forEach(m => window.map.removeLayer(m));
-          window.runwayMarkers = [];
-        }
-        if (window.runwayLine && window.map) {
-          window.map.removeLayer(window.runwayLine);
-          window.runwayLine = null;
-        }
-        // Remove VSS and DEP OIS polygons if present (array or single)
-        if (window.vssPolygon && window.map) {
-          if (Array.isArray(window.vssPolygon)) {
-            window.vssPolygon.forEach(p => {
-              if (p && typeof p.remove === 'function') p.remove();
-              else if (window.map.hasLayer(p)) window.map.removeLayer(p);
-            });
-          } else if (typeof window.vssPolygon.remove === 'function') {
-            window.vssPolygon.remove();
-          } else if (window.map.hasLayer(window.vssPolygon)) {
-            window.map.removeLayer(window.vssPolygon);
-          }
-          window.vssPolygon = null;
-        }
-        if (window.depOisPolygon && window.map) {
-          if (Array.isArray(window.depOisPolygon)) {
-            window.depOisPolygon.forEach(p => {
-              if (p && typeof p.remove === 'function') p.remove();
-              else if (window.map.hasLayer(p)) window.map.removeLayer(p);
-            });
-          } else if (typeof window.depOisPolygon.remove === 'function') {
-            window.depOisPolygon.remove();
-          } else if (window.map.hasLayer(window.depOisPolygon)) {
-            window.map.removeLayer(window.depOisPolygon);
-          }
-          window.depOisPolygon = null;
-        }
-        // Remove all markers, polygons, and polylines except the base tile layer
-        if (window.map && window.map.eachLayer) {
-          window.map.eachLayer(function (layer) {
-            // Remove all except the tile layer (which usually has a getAttribution method)
-            if (!(layer instanceof L.TileLayer)) {
-              window.map.removeLayer(layer);
-            }
-          });
-        }
-        // Do not open the dropdown when clearing (remove any accidental show)
-        dropdown.classList.remove('show');
-        // Reset and clear VSS and DEP OIS forms
-        const vssForm = document.getElementById('vss-form');
-        if (vssForm) vssForm.reset();
-        const depOisForm = document.getElementById('dep-ois-form');
-        if (depOisForm) depOisForm.reset();
-        // Clear all lat/lng/elevation fields in both forms
-        [
-          'thr-lat', 'thr-lng', 'rwyelev',
-          'rwyend-lat', 'rwyend-lng', 'rwyendelev',
-          'dep-start-lat', 'dep-start-lng', 'dep-start-elev',
-          'dep-end-lat', 'dep-end-lng', 'dep-end-elev'
-        ].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.value = '';
-        });
-        // Restore default values for VSS form fields if needed
-        const vpa = document.getElementById('vpa');
-        if (vpa) vpa.value = '3.0';
-        const och = document.getElementById('och');
-        if (och) och.value = '500';
-        const strip = document.getElementById('strip');
-        if (strip) strip.value = '280';
-        const runwaycode = document.getElementById('runwaycode');
-        if (runwaycode) runwaycode.value = '3,4';
-        const offsetangle = document.getElementById('offsetangle');
-        if (offsetangle) offsetangle.value = '0';
-        const depOffset = document.getElementById('dep-offset');
-        if (depOffset) depOffset.value = '0';
-        const cwyLength = document.getElementById('cwy-length');
-        if (cwyLength) cwyLength.value = '0';
-      });
-    });
+    window.addEventListener('DOMContentLoaded', populateAerodromeSelect);
   </script>
 </body>
 
