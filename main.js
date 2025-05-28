@@ -1,138 +1,3 @@
-// #region Leaflet Map Initialization
-// Initialize Leaflet map and base tile layer
-var map = L.map("map").setView([-43.47498889, 172.54828611], 13);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-  attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
-  maxZoom: 19,
-}).addTo(map);
-window.map = map;
-// Add local ruler control if available
-var options = {
-  position: "topleft",
-  lengthUnit: {
-    factor: 1000, // from km to m
-    display: "m.",
-    decimal: 2,
-    label: "Distance:",
-  },
-};
-if (typeof L.control.ruler === "function") {
-  L.control.ruler(options).addTo(map);
-}
-// #endregion
-
-// #region CSV Parsing & Aerodrome/Runway Data
-/**
- * Parses the runways.csv file and returns a list of unique ICAO codes (column 17).
- * @returns {Promise<string[]>} Promise resolving to an array of unique ICAO codes.
- */
-async function getUniqueAerodromeICAOs() {
-  const response = await fetch("data/runways.csv");
-  const text = await response.text();
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  const icaoSet = new Set();
-  for (let i = 1; i < lines.length; i++) {
-    // skip header
-    const cols = lines[i].split(",");
-    if (cols.length >= 17) {
-      const icao = cols[16].trim();
-      if (icao) icaoSet.add(icao);
-    }
-  }
-  return Array.from(icaoSet);
-}
-window.getUniqueAerodromeICAOs = getUniqueAerodromeICAOs;
-/**
- * Parses the runways.csv file and returns a mapping of ICAO codes to their runways.
- * @returns {Promise<Object>} Promise resolving to an object: { ICAO: [runway1, runway2, ...], ... }
- */
-async function getAerodromeRunways() {
-  const response = await fetch("data/runways.csv");
-  const text = await response.text();
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  const aerodromeMap = {};
-  for (let i = 1; i < lines.length; i++) {
-    // skip header
-    const cols = lines[i].split(",");
-    if (cols.length >= 17) {
-      const icao = cols[16].trim();
-      const runway = cols[0].trim();
-      if (icao && runway) {
-        if (!aerodromeMap[icao]) aerodromeMap[icao] = [];
-        if (!aerodromeMap[icao].includes(runway))
-          aerodromeMap[icao].push(runway);
-      }
-    }
-  }
-  return aerodromeMap;
-}
-window.getAerodromeRunways = getAerodromeRunways;
-// #endregion
-
-// #region Runway Plotting
-/**
- * Plots all runways for the given ICAO code on the map with labels and zooms to bounds.
- * @param {string} icao - ICAO code of the aerodrome
- * @param {object} map - Leaflet map instance
- */
-async function plotRunwaysForAerodrome(icao, map) {
-  // Remove previous runway markers
-  if (window.runwayMarkers && window.runwayMarkers.length) {
-    window.runwayMarkers.forEach((m) => map.removeLayer(m));
-    window.runwayMarkers = [];
-  }
-  window.runwayBounds = null;
-  if (!icao) return;
-  // Fetch and parse runways.csv
-  const response = await fetch("data/runways.csv");
-  const text = await response.text();
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  const markers = [];
-  const bounds = [];
-  for (let i = 1; i < lines.length; i++) {
-    // skip header
-    const cols = lines[i].split(",");
-    if (cols.length >= 17 && cols[16].trim() === icao) {
-      // Latitude (WGS84) col 5, Longitude (WGS84) col 6
-      const latStr = cols[5].replace("S", "-").replace("N", "").trim();
-      const lngStr = cols[6].replace("E", "").replace("W", "-").trim();
-      const lat = parseFloat(latStr);
-      const lng = parseFloat(lngStr);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        const smallIcon = L.icon({
-          iconUrl:
-            "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-          iconSize: [14, 22], // smaller than default
-          iconAnchor: [7, 22],
-          shadowUrl:
-            "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
-          shadowSize: [13, 21],
-          shadowAnchor: [4, 21],
-        });
-        const marker = L.marker([lat, lng], { icon: smallIcon }).addTo(map);
-        marker
-          .bindTooltip(cols[0].trim(), {
-            permanent: true,
-            direction: "top",
-            className: "runway-label",
-            offset: [0, -12],
-          })
-          .openTooltip();
-        markers.push(marker);
-        bounds.push([lat, lng]);
-      }
-    }
-  }
-  window.runwayMarkers = markers;
-  if (bounds.length) {
-    window.runwayBounds = L.latLngBounds(bounds);
-    map.fitBounds(window.runwayBounds, { padding: [20, 20] });
-  }
-}
-window.plotRunwaysForAerodrome = plotRunwaysForAerodrome;
-// #endregion
-
-// #region Utility Functions
 // Helper: Convert degrees to radians
 function toRad(deg) {
   return (deg * Math.PI) / 180;
@@ -145,9 +10,10 @@ function toDeg(rad) {
 function ftToM(ft) {
   return ft * 0.3048;
 }
-// #endregion
 
-// #region Coordinate Conversion (proj4)
+// Add proj4 for coordinate conversion
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
+
 // EPSG:4326 (WGS84) and EPSG:2193 (NZTM2000)
 const projWGS84 = "EPSG:4326";
 const projNZTM = "EPSG:2193";
@@ -155,6 +21,7 @@ proj4.defs(
   projNZTM,
   "+proj=tmerc +lat_0=0 +lon_0=173 +k=0.9996 +x_0=1600000 +y_0=10000000 +datum=WGS84 +units=m +no_defs"
 );
+
 // Helper: Convert [lat, lng] to [x, y] NZTM
 function toXY(lat, lng) {
   return proj4(projWGS84, projNZTM, [lng, lat]);
@@ -164,9 +31,7 @@ function toLatLng(x, y) {
   const [lng, lat] = proj4(projNZTM, projWGS84, [x, y]);
   return [lat, lng];
 }
-// #endregion
 
-// #region Geometry Calculations
 // Calculate bearing from runway threshold to runway end using EPSG:2193 (NZTM)
 function calculateRwyBearing(thrLat, thrLng, endLat, endLng) {
   // Convert to x/y (NZTM)
@@ -181,9 +46,7 @@ function calculateRwyBearing(thrLat, thrLng, endLat, endLng) {
   if (facInput) facInput.value = bearing.toFixed(2);
   return bearing;
 }
-// #endregion
 
-// #region VSS Polygon Logic & KML Export
 let vssLayerId = "vss-extrusion";
 
 // Add KML export functionality
@@ -222,7 +85,42 @@ function vssToKML(vssPoly3D) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n${markerStyles}\n${polyStyle}\n    <Placemark>\n      <name>VSS Polygon</name>\n      <styleUrl>#vssPolyStyle</styleUrl>\n      <Polygon>\n        <extrude>0</extrude>\n        <altitudeMode>absolute</altitudeMode>\n        <outerBoundaryIs>\n          <LinearRing>\n            <coordinates>${coordinates}</coordinates>\n          </LinearRing>\n        </outerBoundaryIs>\n      </Polygon>\n    </Placemark>\n${vertexPlacemarks}\n  </Document>\n</kml>`;
 }
 
+// Add KML export functionality for DEP OIS
+function depOisToKML(depOisPoly3D) {
+  // depOisPoly3D: [baseRight, leftEnd, rightEnd, baseLeft, baseRight]
+  const [baseRight, leftEnd, rightEnd, baseLeft] = depOisPoly3D;
+  const vertexNames = ["", "", "", ""];
+  const vertexIcons = [
+    "http://maps.google.com/mapfiles/kml/paddle/A.png",
+    "http://maps.google.com/mapfiles/kml/paddle/B.png",
+    "http://maps.google.com/mapfiles/kml/paddle/C.png",
+    "http://maps.google.com/mapfiles/kml/paddle/D.png",
+  ];
+  const markerStyles = vertexIcons
+    .map(
+      (icon, i) =>
+        `    <Style id="marker${i}">\n      <IconStyle>\n        <Icon>\n          <href>${icon}</href>\n        </Icon>\n      </IconStyle>\n    </Style>`
+    )
+    .join("\n");
+  const vertexPlacemarks = depOisPoly3D
+    .slice(0, 4)
+    .map(
+      ([lat, lng, alt], idx) =>
+        `    <Placemark>\n      <name>${vertexNames[idx]}</name>\n      <styleUrl>#marker${idx}</styleUrl>\n      <Point>\n        <coordinates>${lng},${lat},${alt}</coordinates>\n        <altitudeMode>absolute</altitudeMode>\n      </Point>\n    </Placemark>`
+    )
+    .join("\n");
+  const coordinates = depOisPoly3D
+    .map(([lat, lng, alt]) => `${lng},${lat},${alt}`)
+    .join(" ");
+  const polyStyle = `    <Style id="depOisPolyStyle">\n      <LineStyle>\n        <color>ff00aaff</color>\n        <width>2</width>\n      </LineStyle>\n      <PolyStyle>\n        <color>cc00aaff</color>\n      </PolyStyle>\n    </Style>`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n${markerStyles}\n${polyStyle}\n    <Placemark>\n      <name>DEP OIS Polygon</name>\n      <styleUrl>#depOisPolyStyle</styleUrl>\n      <Polygon>\n        <extrude>0</extrude>\n        <altitudeMode>absolute</altitudeMode>\n        <outerBoundaryIs>\n          <LinearRing>\n            <coordinates>${coordinates}</coordinates>\n          </LinearRing>\n        </outerBoundaryIs>\n      </Polygon>\n    </Placemark>\n${vertexPlacemarks}\n  </Document>\n</kml>`;
+}
+
+// Store last VSS polygon for export
 window.lastVssPoly3D = null;
+
+// Store last DEP OIS polygon for export
+window.lastDepOisPoly3D = null;
 
 document.getElementById("vss-form").addEventListener("submit", function (e) {
   e.preventDefault();
@@ -457,9 +355,7 @@ document.getElementById("vss-form").addEventListener("submit", function (e) {
     }
   );
 });
-// #endregion
 
-// #region VSS Map Drawing & Markers
 // Draw a line between runway threshold and runway end if both are set
 function drawRunwayLine() {
   const thrLat = parseFloat(document.getElementById("thr-lat").value);
@@ -479,15 +375,17 @@ function drawRunwayLine() {
     ).addTo(window.map);
   }
 }
+
+// Listen for changes to runwaythr and runwayend and update the line
 ["runwaythr", "runwayend"].forEach((id) => {
   document.getElementById(id).addEventListener("change", drawRunwayLine);
 });
+// Also update the line if the lat/lng fields change (e.g. after selection)
 ["thr-lat", "thr-lng", "rwyend-lat", "rwyend-lng"].forEach((id) => {
   document.getElementById(id).addEventListener("input", drawRunwayLine);
 });
-// #endregion
 
-// #region DEP OIS Polygon Logic & Map Drawing
+// Helper to draw DEP OIS runway line if both start and end lat/lng fields are set
 function drawDepOisRunwayLine() {
   const startLat = parseFloat(document.getElementById("dep-start-lat").value);
   const startLng = parseFloat(document.getElementById("dep-start-lng").value);
@@ -521,6 +419,7 @@ function drawDepOisRunwayLine() {
     // console.log("[DEP OIS] Not drawing line: invalid or missing coordinates");
   }
 }
+
 const depOisForm = document.getElementById("dep-ois-form");
 if (depOisForm) {
   depOisForm.addEventListener("submit", function (e) {
@@ -532,6 +431,9 @@ if (depOisForm) {
     const endLng = parseFloat(document.getElementById("dep-end-lng").value);
     const cwyLength =
       parseFloat(document.getElementById("cwy-length").value) || 0;
+    // Use the value from the dep-offset input field, negative = left, positive = right
+    const offset =
+      -1 * parseFloat(document.getElementById("dep-offset").value) || 0;
     // Validation
     if (
       !isFinite(startLat) ||
@@ -582,14 +484,19 @@ if (depOisForm) {
     const dx = endXY[0] - startXY[0];
     const dy = endXY[1] - startXY[1];
     const rwyBrg = Math.atan2(dx, dy); // radians
+
     // Base origin: at runway end, or cwyLength from end along centerline
     let baseOriginXY = [endXY[0], endXY[1]];
+    let baseOriginElev = 5 + (parseFloat(document.getElementById("dep-end-elev").value) || 0);
     if (cwyLength > 0) {
       baseOriginXY = [
         endXY[0] + cwyLength * Math.sin(rwyBrg),
         endXY[1] + cwyLength * Math.cos(rwyBrg),
       ];
+      // Elevation at base origin is still rwyend elev + 5m
+      // (CWY is flat, not sloped)
     }
+
     // Base corners (perpendicular to centerline)
     const baseLeftXY = [
       baseOriginXY[0] + (baseWidth / 2) * Math.cos(rwyBrg),
@@ -600,13 +507,22 @@ if (depOisForm) {
       baseOriginXY[1] + (baseWidth / 2) * Math.sin(rwyBrg),
     ];
 
-    // Splay angles
-    const leftSplay = -splayDeg;
-    const rightSplay = splayDeg;
+    // Splay angles (match VSS logic)
+    let leftSplay, rightSplay;
+    if (offset < 0) {
+      leftSplay = offset - splayDeg;
+      rightSplay = splayDeg;
+    } else if (offset > 0) {
+      rightSplay = offset + splayDeg;
+      leftSplay = -splayDeg;
+    } else {
+      leftSplay = -splayDeg;
+      rightSplay = splayDeg;
+    }
     // Splay angles in radians
     const leftSplayRad = toRad(leftSplay);
     const rightSplayRad = toRad(rightSplay);
-    // End corners (splayed from base corners, using offset)
+    // End corners (splayed from base corners)
     const leftEndDir = rwyBrg + leftSplayRad;
     const rightEndDir = rwyBrg + rightSplayRad;
     const leftEndXY = [
@@ -617,20 +533,34 @@ if (depOisForm) {
       baseRightXY[0] + length * Math.sin(rightEndDir),
       baseRightXY[1] + length * Math.cos(rightEndDir),
     ];
-    // Convert all XY to lat/lng
+
+    // Calculate elevations for DEP OIS vertices using 2.5% slope along centerline
+    // Base elevation is rwyend elev + 5m
+    // End elevation is base elevation + (5000m * 0.025)
+    const depBaseElev = baseOriginElev;
+    const depEndElev = depBaseElev + (5000 * 0.025);
+
+    // Vertices with elevation: [lat, lng, elev]
+    // baseRight3D and baseLeft3D use depBaseElev
+    // leftEnd3D and rightEnd3D use depEndElev
     const baseLeft = toLatLng(baseLeftXY[0], baseLeftXY[1]);
     const baseRight = toLatLng(baseRightXY[0], baseRightXY[1]);
     const leftEnd = toLatLng(leftEndXY[0], leftEndXY[1]);
     const rightEnd = toLatLng(rightEndXY[0], rightEndXY[1]);
-    // Calculate elevations for DEP OIS vertices
-    const depBaseElev =
-      5 + (parseFloat(document.getElementById("dep-end-elev").value) || 0);
-    const depEndElev = 5000 * 0.025 + depBaseElev; // 5000m * 0.025 + base elev
-    // Vertices with elevation: [lat, lng, elev]
     const baseRight3D = [baseRight[0], baseRight[1], depBaseElev];
     const leftEnd3D = [leftEnd[0], leftEnd[1], depEndElev];
     const rightEnd3D = [rightEnd[0], rightEnd[1], depEndElev];
     const baseLeft3D = [baseLeft[0], baseLeft[1], depBaseElev];
+
+    // Store for export (order: baseRight, leftEnd, rightEnd, baseLeft, baseRight)
+    window.lastDepOisPoly3D = [
+      baseRight3D,
+      leftEnd3D,
+      rightEnd3D,
+      baseLeft3D,
+      baseRight3D,
+    ];
+
     // Log the vertices as [lat, lng, elev]
     console.log("DEP OIS vertices (lat, lng, elev):", [
       baseRight3D,
@@ -687,6 +617,7 @@ if (depOisForm) {
     });
   });
 }
+
 // Also call drawDepOisRunwayLine on form submit (for safety)
 const depOisFormSafety = document.getElementById("dep-ois-form");
 if (depOisFormSafety) {
@@ -695,9 +626,7 @@ if (depOisFormSafety) {
     drawDepOisRunwayLine();
   });
 }
-// #endregion
 
-// #region KML Export Button Logic
 // Add event listener for Export KML button
 const exportBtn = document.getElementById("export-kml");
 if (exportBtn) {
@@ -750,9 +679,9 @@ if (exportBtn) {
     }
     let defaultFileName = "vss.kml";
     if (icao && thr) {
-      defaultFileName = `${icao}-RWY${thr}`;
+      defaultFileName = `${icao}-VSS-RWY${thr}`;
     } else if (icao) {
-      defaultFileName = `${icao}-RWY`;
+      defaultFileName = `${icao}-VSS-RWY`;
     }
     defaultFileName += ".kml";
     // Use File System Access API if available
@@ -816,9 +745,122 @@ if (exportBtn) {
     }
   });
 }
-// #endregion
 
-// #region Bootstrap Tooltips
+// DEP OIS form event handlers
+const depExportKmlBtn = document.getElementById("dep-export-kml");
+if (depExportKmlBtn) {
+  depExportKmlBtn.addEventListener("click", async function () {
+    if (!window.lastDepOisPoly3D) {
+      if (window.Swal) {
+        Swal.fire({
+          icon: "error",
+          title: "No DEP OIS Polygon",
+          text: "Please draw the DEP OIS polygon first.",
+          confirmButtonColor: "#0d6efd",
+          background: "#fff",
+          color: "#212529",
+        });
+      } else {
+        const script = document.createElement("script");
+        script.src =
+          "https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js";
+        script.onload = function () {
+          Swal.fire({
+            icon: "error",
+            title: "No DEP OIS Polygon",
+            text: "Please draw the DEP OIS polygon first.",
+            confirmButtonColor: "#0d6efd",
+            background: "#fff",
+            color: "#212529",
+          });
+        };
+        document.head.appendChild(script);
+      }
+      return;
+    }
+    const kml = depOisToKML(window.lastDepOisPoly3D);
+    // Determine ICAO and RWY for filename
+    let icao = "";
+    let rwy = "";
+    const icaoEl = document.getElementById("aerodrome");
+    if (icaoEl) icao = icaoEl.value.trim();
+    const rwyEl = document.getElementById("dep-rwythr");
+    if (rwyEl) {
+      const raw = rwyEl.value.trim();
+      const match = raw.match(/(\d{2})([A-Z])?$/i);
+      if (match) {
+        rwy = match[1] + (match[2] ? match[2].toUpperCase() : "");
+      }
+    }
+    let defaultFileName = "dep_ois.kml";
+    if (icao && rwy) {
+      defaultFileName = `${icao}-DEP-OIS-RWY${rwy}`;
+    } else if (icao) {
+      defaultFileName = `${icao}-DEP-OIS-RWY`;
+    }
+    defaultFileName += ".kml";
+    // Use File System Access API if available
+    if (window.showSaveFilePicker) {
+      try {
+        const opts = {
+          suggestedName: defaultFileName,
+          types: [
+            {
+              description: "KML Files",
+              accept: { "application/vnd.google-earth.kml+xml": [".kml"] },
+            },
+          ],
+        };
+        const handle = await window.showSaveFilePicker(opts);
+        const writable = await handle.createWritable();
+        await writable.write(kml);
+        await writable.close();
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          if (window.Swal) {
+            Swal.fire({
+              icon: "error",
+              title: "Export Error",
+              text: "Failed to save KML file.",
+              confirmButtonColor: "#0d6efd",
+              background: "#fff",
+              color: "#212529",
+            });
+          } else {
+            const script = document.createElement("script");
+            script.src =
+              "https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js";
+            script.onload = function () {
+              Swal.fire({
+                icon: "error",
+                title: "Export Error",
+                text: "Failed to save KML file.",
+                confirmButtonColor: "#0d6efd",
+                background: "#fff",
+                color: "#212529",
+              });
+            };
+            document.head.appendChild(script);
+          }
+        }
+      }
+    } else {
+      // Fallback: Blob download
+      const blob = new Blob([kml], {
+        type: "application/vnd.google-earth.kml+xml",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = defaultFileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  });
+}
+
 // Initialize Bootstrap tooltips globally
 if (window.bootstrap) {
   const tooltipTriggerList = [].slice.call(
@@ -828,9 +870,7 @@ if (window.bootstrap) {
     new bootstrap.Tooltip(tooltipTriggerEl);
   });
 }
-// #endregion
 
-// #region Dynamic Runway Dropdowns (VSS & DEP OIS)
 // Dynamic loading of runway THR options for DEP OIS form
 const depRwyThr = document.getElementById("dep-rwythr"); // END
 const depStartRwy = document.getElementById("dep-startrwy"); // START
@@ -897,9 +937,7 @@ if (aerodromeSelect) {
     }
   });
 }
-// #endregion
 
-// #region DEP OIS Field Autofill
 // DEP OIS: Fill out lat/lng/elev fields when start or end runway is selected
 if (depStartRwy) {
   depStartRwy.addEventListener("change", async function () {
@@ -961,62 +999,7 @@ if (depRwyThr) {
     drawDepOisRunwayLine();
   });
 }
-// #endregion
 
-// #region VSS Form: Auto-select Opposite Runway End
-(function () {
-  const thrSelect = document.getElementById("runwaythr");
-  const endSelect = document.getElementById("runwayend");
-  if (!thrSelect || !endSelect) return;
-  let thrTimeout = null;
-  thrSelect.addEventListener("change", function () {
-    if (thrTimeout) clearTimeout(thrTimeout);
-    const thrValue = thrSelect.value;
-    if (!thrValue) return;
-    thrTimeout = setTimeout(() => {
-      // Extract number and optional suffix
-      const match = thrValue.match(/^(\d{2})([A-Z]?)$/i);
-      if (!match) return;
-      let num = match[1];
-      let suffix = match[2] || "";
-      // Add 0 to make 3 digits
-      let bearing = parseInt(num + "0", 10);
-      // Opposite bearing
-      let oppBearing = (bearing + 180) % 360;
-      // Convert back to 2-digit runway number (with leading zero)
-      let oppNum = String(Math.round(oppBearing / 10)).padStart(2, "0");
-      // Try to find a runway in the END select with the same suffix
-      let found = false;
-      for (let i = 0; i < endSelect.options.length; i++) {
-        const opt = endSelect.options[i];
-        const optMatch = opt.value.match(/^(\d{2})([A-Z]?)$/i);
-        if (!optMatch) continue;
-        if (optMatch[1] === oppNum && optMatch[2] === suffix) {
-          endSelect.selectedIndex = i;
-          endSelect.dispatchEvent(new Event("change"));
-          found = true;
-          break;
-        }
-      }
-      // If not found with suffix, try without suffix
-      if (!found) {
-        for (let i = 0; i < endSelect.options.length; i++) {
-          const opt = endSelect.options[i];
-          const optMatch = opt.value.match(/^(\d{2})([A-Z]?)$/i);
-          if (!optMatch) continue;
-          if (optMatch[1] === oppNum) {
-            endSelect.selectedIndex = i;
-            endSelect.dispatchEvent(new Event("change"));
-            break;
-          }
-        }
-      }
-    }, 500);
-  });
-})();
-// #endregion
-
-// #region VSS & DEP OIS Clear Button Logic
 // VSS Clear button logic
 const vssClearBtn = document.querySelector("#vss-form-card .btn-danger");
 if (vssClearBtn) {
@@ -1062,16 +1045,6 @@ if (vssClearBtn) {
   });
 }
 
-// Also clear lastVssPoly3D when the aerodrome-search clear (x) button is clicked
-const aerodromeSearchClearBtn = document.getElementById(
-  "aerodrome-search-clear"
-);
-if (aerodromeSearchClearBtn) {
-  aerodromeSearchClearBtn.addEventListener("mousedown", function () {
-    window.lastVssPoly3D = null;
-  });
-}
-
 // DEP OIS Clear button logic
 const depClearBtn = document.getElementById("dep-clear");
 if (depClearBtn) {
@@ -1110,44 +1083,7 @@ if (depClearBtn) {
     });
   });
 }
-// #endregion
 
-// #region DEP OIS Export Button (Not Implemented)
-// DEP OIS form event handlers
-const depExportKmlBtn = document.getElementById("dep-export-kml");
-if (depExportKmlBtn) {
-  depExportKmlBtn.addEventListener("click", function () {
-    if (window.Swal) {
-      Swal.fire({
-        icon: "info",
-        title: "Not Implemented",
-        text: "DEP OIS KML export is not yet implemented.",
-        confirmButtonColor: "#0d6efd",
-        background: "#fff",
-        color: "#212529",
-      });
-    } else {
-      // Dynamically load SweetAlert2 if not present
-      const script = document.createElement("script");
-      script.src =
-        "https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js";
-      script.onload = function () {
-        Swal.fire({
-          icon: "info",
-          title: "Not Implemented",
-          text: "DEP OIS KML export is not yet implemented.",
-          confirmButtonColor: "#0d6efd",
-          background: "#fff",
-          color: "#212529",
-        });
-      };
-      document.head.appendChild(script);
-    }
-  });
-}
-// #endregion
-
-// #region Overlay Clearing Helper
 // Helper to clear all overlays: runway line, VSS, and DEP OIS
 function clearAllOverlays() {
   if (window.runwayLine) {
@@ -1171,6 +1107,8 @@ function clearAllOverlays() {
     window.depOisMarkers = null;
   }
 }
+
+// Remove overlays when aerodrome, surface type, or any runway select changes
 [
   "aerodrome",
   "surface-type",
@@ -1184,9 +1122,7 @@ function clearAllOverlays() {
     el.addEventListener("change", clearAllOverlays);
   }
 });
-// #endregion
 
-// #region UI: Toggle Hidden Fields (VSS & DEP OIS)
 // Toggle VSS hidden fields visibility
 const vssToggleBtn = document.getElementById("vss-toggle-hidden-fields");
 if (vssToggleBtn) {
@@ -1267,4 +1203,3 @@ depOisToggleBtn.addEventListener("click", function () {
     }
   }
 });
-// #endregion
