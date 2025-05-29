@@ -205,16 +205,16 @@ document.getElementById("vss-form").addEventListener("submit", function (e) {
   const offset =
     -1 * parseFloat(document.getElementById("offsetangle").value) || 0;
   let leftSplay, rightSplay;
-  // If offset is negative, splay with offset should be on the left side of the rwycl when approaching the runway threshold
+  // If offset is negative, the offset should be to the left when facing away from the runway (i.e., baseLeft)
   if (offset < 0) {
-    leftSplay = offset - splayAngle;
-    rightSplay = splayAngle;
+    leftSplay = splayAngle + Math.abs(offset); // more negative = more left
+    rightSplay = -splayAngle;
   } else if (offset > 0) {
-    rightSplay = offset + splayAngle;
-    leftSplay = -splayAngle;
+    leftSplay = splayAngle;
+    rightSplay = -splayAngle - Math.abs(offset); // more positive = more right
   } else {
-    leftSplay = -splayAngle;
-    rightSplay = splayAngle;
+    leftSplay = splayAngle;
+    rightSplay = -splayAngle;
   }
 
   console.log("Left splay:", leftSplay);
@@ -431,10 +431,8 @@ if (depOisForm) {
     const endLng = parseFloat(document.getElementById("dep-end-lng").value);
     const cwyLength =
       parseFloat(document.getElementById("cwy-length").value) || 0;
-    // Use the value from the dep-offset input field, negative = left, positive = right
     const offset =
       -1 * parseFloat(document.getElementById("dep-offset").value) || 0;
-    // Validation
     if (
       !isFinite(startLat) ||
       !isFinite(startLng) ||
@@ -469,13 +467,12 @@ if (depOisForm) {
       }
       return;
     }
-    // Remove previous polygon if present
     if (window.depOisPoly) {
       window.map.removeLayer(window.depOisPoly);
     }
     // Geometry constants
     const baseWidth = 300; // meters
-    const length = 5000; // meters
+    const length = 5000; // meters (measured along centerline)
     const splayDeg = 15;
     // Convert to x/y (NZTM)
     const startXY = toXY(startLat, startLng);
@@ -487,14 +484,13 @@ if (depOisForm) {
 
     // Base origin: at runway end, or cwyLength from end along centerline
     let baseOriginXY = [endXY[0], endXY[1]];
-    let baseOriginElev = 5 + (parseFloat(document.getElementById("dep-end-elev").value) || 0);
+    let baseOriginElev =
+      5 + (parseFloat(document.getElementById("dep-end-elev").value) || 0);
     if (cwyLength > 0) {
       baseOriginXY = [
         endXY[0] + cwyLength * Math.sin(rwyBrg),
         endXY[1] + cwyLength * Math.cos(rwyBrg),
       ];
-      // Elevation at base origin is still rwyend elev + 5m
-      // (CWY is flat, not sloped)
     }
 
     // Base corners (perpendicular to centerline)
@@ -509,40 +505,42 @@ if (depOisForm) {
 
     // Splay angles (match VSS logic)
     let leftSplay, rightSplay;
+    // If offset is negative, the offset should be to the left when facing away from the runway (i.e., baseLeft)
     if (offset < 0) {
-      leftSplay = offset - splayDeg;
-      rightSplay = splayDeg;
+      leftSplay = splayDeg + Math.abs(offset); // more negative = more left
+      rightSplay = -splayDeg;
     } else if (offset > 0) {
-      rightSplay = offset + splayDeg;
-      leftSplay = -splayDeg;
+      leftSplay = splayDeg;
+      rightSplay = -splayDeg - Math.abs(offset); // more positive = more right
     } else {
-      leftSplay = -splayDeg;
-      rightSplay = splayDeg;
+      leftSplay = splayDeg;
+      rightSplay = -splayDeg;
     }
     // Splay angles in radians
     const leftSplayRad = toRad(leftSplay);
     const rightSplayRad = toRad(rightSplay);
-    // End corners (splayed from base corners)
+
+    // End corners (projected from base corners, using splay angles and hypotenuse)
+    // The end line is always perpendicular to the centerline, but the splay determines how far out the end corners are
+    // Calculate hypotenuse for each splay
+    const leftHypotenuse = length / Math.cos(leftSplayRad);
+    const rightHypotenuse = length / Math.cos(rightSplayRad);
     const leftEndDir = rwyBrg + leftSplayRad;
     const rightEndDir = rwyBrg + rightSplayRad;
     const leftEndXY = [
-      baseLeftXY[0] + length * Math.sin(leftEndDir),
-      baseLeftXY[1] + length * Math.cos(leftEndDir),
+      baseLeftXY[0] + leftHypotenuse * Math.sin(leftEndDir),
+      baseLeftXY[1] + leftHypotenuse * Math.cos(leftEndDir),
     ];
     const rightEndXY = [
-      baseRightXY[0] + length * Math.sin(rightEndDir),
-      baseRightXY[1] + length * Math.cos(rightEndDir),
+      baseRightXY[0] + rightHypotenuse * Math.sin(rightEndDir),
+      baseRightXY[1] + rightHypotenuse * Math.cos(rightEndDir),
     ];
 
     // Calculate elevations for DEP OIS vertices using 2.5% slope along centerline
-    // Base elevation is rwyend elev + 5m
-    // End elevation is base elevation + (5000m * 0.025)
     const depBaseElev = baseOriginElev;
-    const depEndElev = depBaseElev + (5000 * 0.025);
+    const depEndElev = depBaseElev + length * 0.025;
 
     // Vertices with elevation: [lat, lng, elev]
-    // baseRight3D and baseLeft3D use depBaseElev
-    // leftEnd3D and rightEnd3D use depEndElev
     const baseLeft = toLatLng(baseLeftXY[0], baseLeftXY[1]);
     const baseRight = toLatLng(baseRightXY[0], baseRightXY[1]);
     const leftEnd = toLatLng(leftEndXY[0], leftEndXY[1]);
@@ -552,29 +550,29 @@ if (depOisForm) {
     const rightEnd3D = [rightEnd[0], rightEnd[1], depEndElev];
     const baseLeft3D = [baseLeft[0], baseLeft[1], depBaseElev];
 
-    // Store for export (order: baseRight, leftEnd, rightEnd, baseLeft, baseRight)
+    // Store for export (order: baseLeft, leftEnd, rightEnd, baseRight, baseLeft)
     window.lastDepOisPoly3D = [
-      baseRight3D,
+      baseLeft3D,
       leftEnd3D,
       rightEnd3D,
-      baseLeft3D,
       baseRight3D,
+      baseLeft3D,
     ];
 
     // Log the vertices as [lat, lng, elev]
     console.log("DEP OIS vertices (lat, lng, elev):", [
-      baseRight3D,
+      baseLeft3D,
       leftEnd3D,
       rightEnd3D,
-      baseLeft3D,
+      baseRight3D,
     ]);
-    // Polygon: baseRight -> leftEnd -> rightEnd -> baseLeft -> baseRight
+    // Polygon: baseLeft -> leftEnd -> rightEnd -> baseRight -> baseLeft
     const depOisPolyLatLngs = [
-      [baseRight[0], baseRight[1]],
+      [baseLeft[0], baseLeft[1]],
       [leftEnd[0], leftEnd[1]],
       [rightEnd[0], rightEnd[1]],
-      [baseLeft[0], baseLeft[1]],
       [baseRight[0], baseRight[1]],
+      [baseLeft[0], baseLeft[1]],
     ];
     window.depOisPoly = L.polygon(depOisPolyLatLngs, {
       color: "orange",
@@ -584,14 +582,14 @@ if (depOisForm) {
     // Fit map to bounds of the DEP OIS polygon (same as VSS logic)
     window.map.fitBounds(window.depOisPoly.getBounds(), { padding: [20, 20] });
 
-    // Add markers for each DEP OIS polygon vertex (A: baseRight, B: leftEnd, C: rightEnd, D: baseLeft)
+    // Add markers for each DEP OIS polygon vertex (A: baseLeft, B: leftEnd, C: rightEnd, D: baseRight)
     if (window.depOisMarkers) {
       window.depOisMarkers.forEach((marker) => {
         window.map.removeLayer(marker);
       });
     }
     const depOisMarkerLabels = ["A", "B", "C", "D"];
-    const depOisVertices = [baseRight, leftEnd, rightEnd, baseLeft];
+    const depOisVertices = [baseLeft, leftEnd, rightEnd, baseRight];
     const depOisIcon = L.icon({
       iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
       iconSize: [18, 30],
@@ -1203,3 +1201,6 @@ depOisToggleBtn.addEventListener("click", function () {
     }
   }
 });
+
+// Refactored DEP OIS polygon logic to match VSS geometric approach
+// Calculate hypotenuse for each splay, then compute end points from base corners using hypotenuse and splay direction. This ensures the DEP OIS shape is constructed identically to VSS except for its unique parameters.
