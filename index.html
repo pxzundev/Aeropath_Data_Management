@@ -15,243 +15,263 @@
 </head>
 
 <body>
-  <div class="sidebar">
-    <div class="card mb-4">
-      <h5 class="card-header">General</h5>
-      <div class="card-body">
-        <div class="mb-4 d-flex align-items-center">
-          <div class="flex-grow-1 me-2">
-            <label for="aerodrome" class="form-label">Aerodrome</label>
-            <select class="form-select" id="aerodrome">
-              <option value="">Select Aerodrome</option>
-              <!-- Add more aerodromes as needed -->
+  <div class="sidebar d-flex flex-column" style="height: 100vh;">
+    <div class="flex-grow-1">
+      <h5 class="mb-4 d-flex align-items-center justify-content-between">
+        <span class="d-flex align-items-center">
+          <img src="static/images/aeropath.png" alt="Aeropath Logo"
+            style="height: 2rem; width: 2rem; margin-right: 0.5rem;">
+          PD Data Manager KMLGen
+        </span>
+        <span class="badge badge-sm rounded-pill bg-primary ms-2" style="font-size:0.5=65em;">v0.0.1</span>
+      </h5>
+      <div class="card mb-4">
+        <h5 class="card-header">General</h5>
+        <div class="card-body">
+          <div class="mb-4 d-flex align-items-center">
+            <div class="flex-grow-1 me-2">
+              <label for="aerodrome" class="form-label">Aerodrome</label>
+              <select class="form-select" id="aerodrome">
+                <option value="">Select Aerodrome</option>
+                <!-- Add more aerodromes as needed -->
+              </select>
+            </div>
+            <div class="align-self-end mb-1">
+              <button id="refresh-aerodrome" type="button" class="btn btn-secondary btn-sm"
+                title="Refresh Aerodrome List">
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
+            </div>
+          </div>
+          <div class="mb-2">
+            <label for="surface-type" class="form-label">Surface</label>
+            <select class="form-select" id="surface-type">
+              <option value="vss">VSS</option>
+              <option value="dep_ois">DEP OIS</option>
             </select>
           </div>
-          <div class="align-self-end mb-1">
-            <button id="refresh-aerodrome" type="button" class="btn btn-secondary btn-sm"
-              title="Refresh Aerodrome List">
-              <i class="bi bi-arrow-clockwise"></i>
-            </button>
+        </div>
+      </div>
+
+
+      <!-- #region VSS Form Component Start -->
+      <div class="card" id="vss-form-card">
+        <h5 class="card-header d-flex justify-content-between align-items-center">VSS
+          <span id="vss-toggle-hidden-fields" role="button" tabindex="0" title="Show/hide hidden fields">
+            <i class="bi bi-eye-slash"></i>
+          </span>
+        </h5>
+        <div class="card-body">
+          <div id="vss-form-component">
+            <form id="vss-form">
+              <div class="row mb-3">
+                <div class="col-6">
+                  <label for="runwaythr" class="form-label">Runway THR</label>
+                  <select class="form-select" id="runwaythr">
+                    <option value="">THR</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label for="runwayend" class="form-label">Runway End</label>
+                  <select class="form-select" id="runwayend">
+                    <option value="">END</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="row mb-3" hidden>
+                <div class="col-4">
+                  <label for="thr-lat" class="form-label">THR Lat</label>
+                  <input type="number" step="any" class="form-control" disabled id="thr-lat" value="">
+                </div>
+                <div class="col-4">
+                  <label for="thr-lng" class="form-label">THR Lng</label>
+                  <input type="number" step="any" class="form-control" disabled id="thr-lng" value="">
+                </div>
+                <div class="col-4">
+                  <label for="rwyelev" class="form-label">Elev (m)</label>
+                  <input type="number" step="any" class="form-control" disabled id="rwyelev" value="">
+                </div>
+              </div>
+
+              <div class="row mb-3" hidden>
+                <div class="col-4">
+                  <label for="rwyend-lat" class="form-label">END Lat</label>
+                  <input type="number" step="any" class="form-control" disabled id="rwyend-lat" value="">
+                </div>
+                <div class="col-4">
+                  <label for="rwyend-lng" class="form-label">END Lng</label>
+                  <input type="number" step="any" class="form-control" disabled id="rwyend-lng" value="">
+                </div>
+                <div class="col-4">
+                  <label for="rwyelev" class="form-label">Elev (m)</label>
+                  <input type="number" step="any" class="form-control" disabled id="rwyendelev" value="">
+                </div>
+                <div class="col-4">
+                  <label for="fac" class="form-label">RWY Bearing (deg T)</label>
+                  <input type="number" step="any" class="form-control" disabled id="fac" value=""
+                    data-bs-toggle="tooltip"
+                    title="Calculated runway bearing. This value may be different from what is on the chart">
+                </div>
+              </div>
+
+              <div class="row mb-3">
+                <div class="col-6">
+                  <label for="vpa" class="form-label">VPA (deg)</label>
+                  <input type="number" step="any" class="form-control" id="vpa" value="3.0">
+                </div>
+                <div class="col-6">
+                  <label for="och" class="form-label">OCH (ft)</label>
+                  <input type="number" step="any" class="form-control" id="och" value="500" data-bs-toggle="tooltip"
+                    title="Use the highest OCH">
+                </div>
+              </div>
+
+              <div class="row mb-3">
+                <div class="col-6">
+                  <label for="runwaycode" class="form-label">Code</label>
+                  <select class="form-select" id="runwaycode">
+                    <option value="">1, 2</option>
+                    <option value="3,4" selected>3, 4</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label for="strip" class="form-label">Strip Width (m)</label>
+                  <input type="number" step="any" class="form-control" id="strip" value="280">
+                </div>
+              </div>
+
+              <div class="row mb-4">
+
+                <div class="col-6">
+                  <label for="fac" class="form-label">Offset (deg)</label>
+                  <input type="number" step="any" class="form-control" id="offsetangle" value="0"
+                    data-bs-toggle="tooltip"
+                    title="Offset angle in degrees (negative value is offset left, positive value is offset right)">
+                </div>
+              </div>
+
+              <div class="row mb-3">
+
+                <div class="col-4">
+                  <button type="submit" class="btn btn-primary w-100">Draw VSS</button>
+                </div>
+                <div class="col-4">
+                  <button type="button" class="btn btn-secondary w-100" id="export-kml">Export
+                    KML</button>
+                </div>
+                <div class="col-4">
+                  <button type="button" class="btn btn-danger w-100">Clear</button>
+                </div>
+              </div>
+
+            </form>
           </div>
-        </div>
-        <div class="mb-2">
-          <label for="surface-type" class="form-label">Surface</label>
-          <select class="form-select" id="surface-type">
-            <option value="vss">VSS</option>
-            <option value="dep_ois">DEP OIS</option>
-          </select>
+
         </div>
       </div>
-    </div>
 
 
-    <!-- #region VSS Form Component Start -->
-    <div class="card" id="vss-form-card">
-      <h5 class="card-header d-flex justify-content-between align-items-center">VSS
-        <span id="vss-toggle-hidden-fields" role="button" tabindex="0" title="Show/hide hidden fields">
-          <i class="bi bi-eye-slash"></i>
-        </span>
-      </h5>
-      <div class="card-body">
-        <div id="vss-form-component">
-          <form id="vss-form">
-            <div class="row mb-3">
-              <div class="col-6">
-                <label for="runwaythr" class="form-label">Runway THR</label>
-                <select class="form-select" id="runwaythr">
-                  <option value="">THR</option>
-                </select>
-              </div>
-              <div class="col-6">
-                <label for="runwayend" class="form-label">Runway End</label>
-                <select class="form-select" id="runwayend">
-                  <option value="">END</option>
-                </select>
-              </div>
-            </div>
+      <!-- #endregion VSS Form Component End -->
 
-            <div class="row mb-3" hidden>
-              <div class="col-4">
-                <label for="thr-lat" class="form-label">THR Lat</label>
-                <input type="number" step="any" class="form-control" disabled id="thr-lat" value="">
-              </div>
-              <div class="col-4">
-                <label for="thr-lng" class="form-label">THR Lng</label>
-                <input type="number" step="any" class="form-control" disabled id="thr-lng" value="">
-              </div>
-              <div class="col-4">
-                <label for="rwyelev" class="form-label">Elev (m)</label>
-                <input type="number" step="any" class="form-control" disabled id="rwyelev" value="">
-              </div>
-            </div>
-
-            <div class="row mb-3" hidden>
-              <div class="col-4">
-                <label for="rwyend-lat" class="form-label">END Lat</label>
-                <input type="number" step="any" class="form-control" disabled id="rwyend-lat" value="">
-              </div>
-              <div class="col-4">
-                <label for="rwyend-lng" class="form-label">END Lng</label>
-                <input type="number" step="any" class="form-control" disabled id="rwyend-lng" value="">
-              </div>
-              <div class="col-4">
-                <label for="rwyelev" class="form-label">Elev (m)</label>
-                <input type="number" step="any" class="form-control" disabled id="rwyendelev" value="">
-              </div>
-              <div class="col-4">
-                <label for="fac" class="form-label">RWY Bearing (deg T)</label>
-                <input type="number" step="any" class="form-control" disabled id="fac" value="" data-bs-toggle="tooltip"
-                  title="Calculated runway bearing. This value may be different from what is on the chart">
-              </div>
-            </div>
-
-            <div class="row mb-3">
-              <div class="col-6">
-                <label for="vpa" class="form-label">VPA (deg)</label>
-                <input type="number" step="any" class="form-control" id="vpa" value="3.0">
-              </div>
-              <div class="col-6">
-                <label for="och" class="form-label">OCH (ft)</label>
-                <input type="number" step="any" class="form-control" id="och" value="500" data-bs-toggle="tooltip"
-                  title="Use the highest OCH">
-              </div>
-            </div>
-
-            <div class="row mb-3">
-              <div class="col-6">
-                <label for="runwaycode" class="form-label">Code</label>
-                <select class="form-select" id="runwaycode">
-                  <option value="">1, 2</option>
-                  <option value="3,4" selected>3, 4</option>
-                </select>
-              </div>
-              <div class="col-6">
-                <label for="strip" class="form-label">Strip Width (m)</label>
-                <input type="number" step="any" class="form-control" id="strip" value="280">
-              </div>
-            </div>
-
-            <div class="row mb-4">
-
-              <div class="col-6">
-                <label for="fac" class="form-label">Offset (deg)</label>
-                <input type="number" step="any" class="form-control" id="offsetangle" value="0" data-bs-toggle="tooltip"
-                  title="Offset angle in degrees (negative value is offset left, positive value is offset right)">
-              </div>
-            </div>
-
-            <div class="row mb-3">
-
-              <div class="col-4">
-                <button type="submit" class="btn btn-primary w-100">Draw VSS</button>
-              </div>
-              <div class="col-4">
-                <button type="button" class="btn btn-secondary w-100" id="export-kml">Export
-                  KML</button>
-              </div>
-              <div class="col-4">
-                <button type="button" class="btn btn-danger w-100">Clear</button>
-              </div>
-            </div>
-
-          </form>
-        </div>
-
-      </div>
-    </div>
-
-
-    <!-- #endregion VSS Form Component End -->
-
-    <!-- #region DEP OIS Form Component Start -->
-    <div class="card d-none" id="dep-ois-form-card">
-      <h5 class="card-header">DEP OIS</h5>
-      <div class="card-body">
-        <div id="dep-ois-form-component">
-          <form id="dep-ois-form">
-            <div class="row mb-3">
-              <div class="col-6">
-                <label for="dep-startrwy" class="form-label">RWY Start</label>
-                <select class="form-select" id="dep-startrwy">
-                  <option value="">START</option>
-                </select>
-              </div>
-              <div class="col-6">
-                <label for="dep-rwythr" class="form-label">RWY End</label>
-                <select class="form-select" id="dep-rwythr">
-                  <option value="">END</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="row mb-3" hidden>
-              <div class="col-4">
-                <label for="dep-start-lat" class="form-label">START Lat</label>
-                <input type="number" step="any" class="form-control" disabled id="dep-start-lat" value="">
-              </div>
-              <div class="col-4">
-                <label for="dep-start-lng" class="form-label">START Lng</label>
-                <input type="number" step="any" class="form-control" disabled id="dep-start-lng" value="">
-              </div>
-              <div class="col-4">
-                <label for="dep-start-elev" class="form-label">Elev (m)</label>
-                <input type="number" step="any" class="form-control" disabled id="dep-start-elev" value="">
-              </div>
-            </div>
-
-            <div class="row mb-3" hidden>
-              <div class="col-4">
-                <label for="dep-end-lat" class="form-label">END Lat</label>
-                <input type="number" step="any" class="form-control" disabled id="dep-end-lat" value="">
-              </div>
-              <div class="col-4">
-                <label for="dep-end-lng" class="form-label">END Lng</label>
-                <input type="number" step="any" class="form-control" disabled id="dep-end-lng" value="">
-              </div>
-              <div class="col-4">
-                <label for="dep-end-elev" class="form-label">Elev (m)</label>
-                <input type="number" step="any" class="form-control" disabled id="dep-end-elev" value="">
-              </div>
-            </div>
-
-
-            <div class="row mb-3">
-              <div class="col-4">
-                <label for="cwy-length" class="form-label">CWY Length</label>
-                <input type="number" step="any" class="form-control" id="cwy-length" value="0">
+      <!-- #region DEP OIS Form Component Start -->
+      <div class="card d-none" id="dep-ois-form-card">
+        <h5 class="card-header">DEP OIS</h5>
+        <div class="card-body">
+          <div id="dep-ois-form-component">
+            <form id="dep-ois-form">
+              <div class="row mb-3">
+                <div class="col-6">
+                  <label for="dep-startrwy" class="form-label">RWY Start</label>
+                  <select class="form-select" id="dep-startrwy">
+                    <option value="">START</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label for="dep-rwythr" class="form-label">RWY End</label>
+                  <select class="form-select" id="dep-rwythr">
+                    <option value="">END</option>
+                  </select>
+                </div>
               </div>
 
-              <!-- <div class="col-4">
+              <div class="row mb-3" hidden>
+                <div class="col-4">
+                  <label for="dep-start-lat" class="form-label">START Lat</label>
+                  <input type="number" step="any" class="form-control" disabled id="dep-start-lat" value="">
+                </div>
+                <div class="col-4">
+                  <label for="dep-start-lng" class="form-label">START Lng</label>
+                  <input type="number" step="any" class="form-control" disabled id="dep-start-lng" value="">
+                </div>
+                <div class="col-4">
+                  <label for="dep-start-elev" class="form-label">Elev (m)</label>
+                  <input type="number" step="any" class="form-control" disabled id="dep-start-elev" value="">
+                </div>
+              </div>
+
+              <div class="row mb-3" hidden>
+                <div class="col-4">
+                  <label for="dep-end-lat" class="form-label">END Lat</label>
+                  <input type="number" step="any" class="form-control" disabled id="dep-end-lat" value="">
+                </div>
+                <div class="col-4">
+                  <label for="dep-end-lng" class="form-label">END Lng</label>
+                  <input type="number" step="any" class="form-control" disabled id="dep-end-lng" value="">
+                </div>
+                <div class="col-4">
+                  <label for="dep-end-elev" class="form-label">Elev (m)</label>
+                  <input type="number" step="any" class="form-control" disabled id="dep-end-elev" value="">
+                </div>
+              </div>
+
+
+              <div class="row mb-3">
+                <div class="col-4">
+                  <label for="cwy-length" class="form-label">CWY Length</label>
+                  <input type="number" step="any" class="form-control" id="cwy-length" value="0">
+                </div>
+
+                <!-- <div class="col-4">
                 <label for="dep-type" class="form-label">Type</label>
                 <select class="form-select" id="dep-type">
                   <option value="straight">Straight</option>
                   <option value="turning">Turning</option>
                 </select>
               </div> -->
-              <div class="col-4">
-                <label for="dep-offset" class="form-label">Offset (deg)</label>
-                <input type="number" step="any" class="form-control" id="dep-offset" value="0">
-              </div>
+                <div class="col-4">
+                  <label for="dep-offset" class="form-label">Offset (deg)</label>
+                  <input type="number" step="any" class="form-control" id="dep-offset" value="0">
+                </div>
 
-            </div>
-            <div class="row mb-3">
-              <div class="col-4">
-                <button type="submit" class="btn btn-primary w-100">Draw OIS</button>
               </div>
-              <div class="col-4">
-                <button type="button" class="btn btn-secondary w-100" id="dep-export-kml">Export
-                  KML</button>
+              <div class="row mb-3">
+                <div class="col-4">
+                  <button type="submit" class="btn btn-primary w-100">Draw OIS</button>
+                </div>
+                <div class="col-4">
+                  <button type="button" class="btn btn-secondary w-100" id="dep-export-kml">Export
+                    KML</button>
+                </div>
+                <div class="col-4">
+                  <button type="button" class="btn btn-danger w-100" id="dep-clear">Clear</button>
+                </div>
               </div>
-              <div class="col-4">
-                <button type="button" class="btn btn-danger w-100" id="dep-clear">Clear</button>
-              </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
+      <!-- #endregion DEP OIS Form Component End -->
     </div>
-    <!-- #endregion DEP OIS Form Component End -->
+    <!-- Sticky copyright block inside sidebar -->
+    <div class="w-100 mt-auto" style="position:sticky; bottom:0; background:inherit; z-index:9999;">
+      <hr class="my-2" style="margin-bottom:0.2rem;" />
+      <div class="text-smaller text-muted text-center">
+        Copyright &copy; 2025 <a href="https://aeropath.aero" target="_blank">Aeropath</a>
+      </div>
+    </div>
   </div>
+
 
   <div id="map"></div>
   <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
