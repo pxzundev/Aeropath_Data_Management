@@ -174,7 +174,7 @@ function showCsvPreviewModal(csvText, modalTitle = "CSV Preview") {
   };
 }
 
-// Plot GeoJSON points on the map as Leaflet markers with clustering and smaller icons
+// Plot GeoJSON points on the map as Leaflet markers with batching for large datasets
 window.plotCsvGeoJsonOnMap = function (geojson) {
   if (!window.map || !window.L) return;
   // Remove previous CSV markers layer if present
@@ -182,27 +182,31 @@ window.plotCsvGeoJsonOnMap = function (geojson) {
     window.map.removeLayer(window.csvGeoJsonLayer);
     window.csvGeoJsonLayer = null;
   }
-  if (window.csvGeoJsonCluster) {
-    window.map.removeLayer(window.csvGeoJsonCluster);
-    window.csvGeoJsonCluster = null;
-  }
-  // Use marker clustering (Leaflet.markercluster)
-  if (window.L && (L.MarkerClusterGroup || L.markerClusterGroup)) {
-    // Support both L.MarkerClusterGroup (constructor) and L.markerClusterGroup (factory)
-    const cluster = L.markerClusterGroup
-      ? L.markerClusterGroup()
-      : new L.MarkerClusterGroup();
-    const smallIcon = L.icon({
-      iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-      iconSize: [13, 21], // 30% smaller than [18, 30]
-      iconAnchor: [6, 21],
-      popupAnchor: [0, -10],
-      shadowUrl:
-        "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
-      shadowSize: [9, 15],
-      shadowAnchor: [3, 15],
-    });
-    geojson.features.forEach(function (feature) {
+
+  const smallIcon = L.icon({
+    iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+    iconSize: [13, 21],
+    iconAnchor: [6, 21],
+    popupAnchor: [0, -10],
+    shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
+    shadowSize: [9, 15],
+    shadowAnchor: [3, 15],
+  });
+
+  // Use a LayerGroup to hold all markers
+  const markerLayer = L.layerGroup();
+  window.csvGeoJsonLayer = markerLayer.addTo(window.map);
+
+  const features = geojson.features || [];
+  const total = features.length;
+  const batchSize = 200; // Tune this for performance
+  let idx = 0;
+  let bounds = null;
+
+  function addBatch() {
+    const end = Math.min(idx + batchSize, total);
+    for (; idx < end; idx++) {
+      const feature = features[idx];
       if (
         feature.geometry &&
         feature.geometry.type === "Point" &&
@@ -221,56 +225,26 @@ window.plotCsvGeoJsonOnMap = function (geojson) {
               `<div style='font-size:0.8rem;'>Elev: ${props.elev ?? ""}</div>` +
               `</div>`
           );
-          cluster.addLayer(marker);
+          markerLayer.addLayer(marker);
+          // Expand bounds
+          if (!bounds) {
+            bounds = L.latLngBounds([lat, lng], [lat, lng]);
+          } else {
+            bounds.extend([lat, lng]);
+          }
         }
       }
-    });
-    window.csvGeoJsonCluster = cluster.addTo(window.map);
-    // Fit map to bounds if there are features
-    try {
-      const bounds = cluster.getBounds();
-      if (bounds.isValid()) {
+    }
+    if (idx < total) {
+      requestAnimationFrame(addBatch);
+    } else {
+      // Fit map to bounds if there are features
+      if (bounds && bounds.isValid()) {
         window.map.fitBounds(bounds, { padding: [20, 20] });
       }
-    } catch (e) {}
-    return;
-  } else {
-    // Fallback: no clustering
-    const smallIcon = L.icon({
-      iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-      iconSize: [13, 21],
-      iconAnchor: [6, 21],
-      popupAnchor: [0, -10],
-      shadowUrl:
-        "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
-      shadowSize: [9, 15],
-      shadowAnchor: [3, 15],
-    });
-    window.csvGeoJsonLayer = L.geoJSON(geojson, {
-      pointToLayer: function (feature, latlng) {
-        return L.marker(latlng, { icon: smallIcon }).bindPopup(
-          `<div style='text-align:center;'>` +
-            `<div><strong>${feature.properties.name || ""}</strong></div>` +
-            `<div style='font-size:0.8rem;'>Lat: ${latlng.lat.toFixed(
-              8
-            )}</div>` +
-            `<div style='font-size:0.8rem;'>Lng: ${latlng.lng.toFixed(
-              8
-            )}</div>` +
-            `<div style='font-size:0.8rem;'>Elev: ${
-              feature.properties.elev ?? ""
-            }</div>` +
-            `</div>`
-        );
-      },
-    }).addTo(window.map);
-    try {
-      const bounds = window.csvGeoJsonLayer.getBounds();
-      if (bounds.isValid()) {
-        window.map.fitBounds(bounds, { padding: [20, 20] });
-      }
-    } catch (e) {}
+    }
   }
+  addBatch();
 };
 
 // VSS CSV upload preview
@@ -429,3 +403,62 @@ function parseLatLng(str) {
 
 // Export for use in other scripts (if using modules)
 // window.showCsvPreviewModal = showCsvPreviewModal;
+
+document
+  .getElementById("evaluate-common-csv")
+  ?.addEventListener("click", async function () {
+    // Load vss3d-utils functions (assumes module is loaded globally or via import)
+    // If using modules, you may need to import or expose these functions to window
+    const { toXY, pointInPolygon, getVSSElevationAt } = window.vss3dUtils || {};
+
+    if (!window.lastCsvGeoJson) {
+      console.log("No CSV GeoJSON loaded.");
+      return;
+    }
+
+    // Choose which polygon to use (VSS or DEP OIS)
+    // You must set window.lastVssPoly3D or window.lastDepOisPoly3D when drawing the surface
+    const vssPoly3D = window.lastVssPoly3D || window.lastDepOisPoly3D;
+    if (!vssPoly3D) {
+      console.log("No VSS or DEP OIS polygon available.");
+      return;
+    }
+
+    // Convert polygon to [x, y, z]
+    const vssPoly3D_XYZ = vssPoly3D.map(([lat, lng, elev]) => {
+      const [x, y] = toXY(lat, lng);
+      return [x, y, elev];
+    });
+
+    // Project polygon to [x, y] for pointInPolygon
+    const vssPolyXY = vssPoly3D_XYZ.map(([x, y]) => [x, y]);
+
+    // Evaluate each obstacle
+    window.lastCsvGeoJson.features.forEach((feature, idx) => {
+      const props = feature.properties || {};
+      const lat = feature.geometry.coordinates[1];
+      const lng = feature.geometry.coordinates[0];
+      const elev = props.elev;
+      const [x, y] = toXY(lat, lng);
+      const z = elev;
+
+      console.log(
+        `Obstacle #${
+          idx + 1
+        }: lat=${lat}, lng=${lng}, elev=${elev} -> x=${x}, y=${y}, z=${z}`
+      );
+
+      // Check if inside polygon
+      const inside = pointInPolygon([x, y], vssPolyXY);
+      console.log(`  Inside polygon: ${inside}`);
+
+      if (inside) {
+        // Get surface elevation at (x, y)
+        const surfElev = getVSSElevationAt(x, y, vssPoly3D);
+        console.log(`  Surface elevation at obstacle: ${surfElev}`);
+        // Optionally, check if obstacle is above surface
+        const above = z > surfElev;
+        console.log(`  Obstacle above surface: ${above}`);
+      }
+    });
+  });

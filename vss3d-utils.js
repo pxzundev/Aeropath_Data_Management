@@ -149,3 +149,16 @@ export function barycentricZ(x, y, p0, p1, p2) {
   const w3 = 1 - w1 - w2;
   return w1 * p0[2] + w2 * p1[2] + w3 * p2[2];
 }
+
+// At the end of the file, expose functions for global use (if not using modules)
+if (typeof window !== "undefined") {
+  window.vss3dUtils = {
+    toXY,
+    pointInPolygon,
+    getVSSElevationAt,
+    isObstacleAboveVSS,
+    bilinearInterpolation,
+    planeFitZ,
+    barycentricZ,
+  };
+}
