@@ -15,58 +15,142 @@ function showEvaluationResultsModal(results) {
     ).padStart(2, "0")}' ${s}"${hemi}`;
   }
 
-  let tableHtml = `
-    <div style="overflow-x:auto;">
-      <table class="table table-bordered table-sm align-middle" style="white-space:nowrap;">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>WGS84 Coords</th>
-            <th>NZTM</th>
-            <th>Elevation</th>
-            <th>Surface elevation</th>
-            <th>Remarks</th>
-          </tr>
-        </thead>
-        <tbody>
-  `;
-  for (const r of results) {
-    const dmsLat = toDMS(r.lat, true);
-    const dmsLng = toDMS(r.lng, false);
-    const remarksHtml =
-      r.remarks === "Critical"
-        ? `<span style="color:#dc3545;font-weight:bold;">Critical</span>`
-        : "Not critical";
-    tableHtml += `
-      <tr>
-        <td>${r.name || ""}</td>
-        <td>
-          ${r.lat.toFixed(8)}, ${r.lng.toFixed(8)}<br>
-          <span style="font-size:0.85em;">${dmsLat}, ${dmsLng}</span>
-        </td>
-        <td>
-          ${r.x.toFixed(2)}, ${r.y.toFixed(2)}
-        </td>
-        <td>${r.z}</td>
-        <td>${
-          r.surfElev !== null && r.surfElev !== undefined
-            ? r.surfElev.toFixed(3)
-            : ""
-        }</td>
-        <td>${remarksHtml}</td>
-      </tr>
-    `;
+  // Sorting state
+  let sortCol = null;
+  let sortDir = 1; // 1 = asc, -1 = desc
+
+  // Helper to sort results
+  function sortResults(col) {
+    if (sortCol === col) {
+      sortDir *= -1;
+    } else {
+      sortCol = col;
+      sortDir = 1;
+    }
+    results.sort((a, b) => {
+      let va, vb;
+      switch (col) {
+        case "name":
+          va = (a.name || "").toLowerCase();
+          vb = (b.name || "").toLowerCase();
+          break;
+        case "z":
+          va = +a.z;
+          vb = +b.z;
+          break;
+        case "surfElev":
+          va = +a.surfElev;
+          vb = +b.surfElev;
+          break;
+        case "penetration":
+          va = +a.z - +a.surfElev;
+          vb = +b.z - +b.surfElev;
+          break;
+        case "remarks":
+          va = a.remarks === "Critical" ? 1 : 0;
+          vb = b.remarks === "Critical" ? 1 : 0;
+          break;
+        default:
+          va = vb = 0;
+      }
+      if (va < vb) return -1 * sortDir;
+      if (va > vb) return 1 * sortDir;
+      return 0;
+    });
+    renderTable();
   }
-  tableHtml += `
-        </tbody>
-      </table>
-    </div>
-    <div style="height:2rem;"></div>
-    <div class="d-flex justify-content-end gap-2">
-      <button class="btn btn-primary" disabled>Placeholder 1</button>
-      <button class="btn btn-secondary" disabled>Placeholder 2</button>
-    </div>
-  `;
+
+  // Render table with current sort
+  function renderTable() {
+    let tableHtml = `
+      <div style="overflow-x:auto; overflow-y:auto; height:100%; max-height:100%;">
+        <table class="table table-bordered table-sm align-middle mb-0" style="white-space:nowrap;">
+          <thead>
+            <tr>
+              <th role="button" style="cursor:pointer;" id="sort-name">
+                Name <span style="font-size:0.9em;">${
+                  sortCol === "name" ? (sortDir === 1 ? "▲" : "▼") : "⇅"
+                }</span>
+              </th>
+              <th>WGS84 <br/> Coordinates</th>
+              <th>NZTM <br/> (x, y)</th>
+              <th role="button" style="cursor:pointer;" id="sort-z">
+                Elevation <br/>(m) <span style="font-size:0.9em;">${
+                  sortCol === "z" ? (sortDir === 1 ? "▲" : "▼") : "⇅"
+                }</span>
+              </th>
+              <th role="button" style="cursor:pointer;" id="sort-surfElev">
+                Surface elevation <br/> (m) <span style="font-size:0.9em;">${
+                  sortCol === "surfElev" ? (sortDir === 1 ? "▲" : "▼") : "⇅"
+                }</span>
+              </th>
+              <th role="button" style="cursor:pointer;" id="sort-penetration">
+                Penetration <br/>(m) <span style="font-size:0.9em;">${
+                  sortCol === "penetration" ? (sortDir === 1 ? "▲" : "▼") : "⇅"
+                }</span>
+              </th>
+              <th role="button" style="cursor:pointer;" id="sort-remarks">
+                Remarks <span style="font-size:0.9em;">${
+                  sortCol === "remarks" ? (sortDir === 1 ? "▲" : "▼") : "⇅"
+                }</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    for (const r of results) {
+      const dmsLat = toDMS(r.lat, true);
+      const dmsLng = toDMS(r.lng, false);
+      const remarksHtml =
+        r.remarks === "Critical"
+          ? `<span style="color:#dc3545;font-weight:bold;">Critical</span>`
+          : "Not critical";
+      const penetration =
+        r.surfElev !== null && r.surfElev !== undefined ? r.z - r.surfElev : "";
+      tableHtml += `
+        <tr>
+          <td>${r.name || ""}</td>
+          <td>
+            ${dmsLat}, ${dmsLng}
+          </td>
+          <td>
+            ${r.x.toFixed(2)}, ${r.y.toFixed(2)}
+          </td>
+          <td>${r.z}</td>
+          <td>${
+            r.surfElev !== null && r.surfElev !== undefined
+              ? r.surfElev.toFixed(3)
+              : ""
+          }</td>
+          <td>${penetration !== "" ? penetration.toFixed(3) : ""}</td>
+          <td>${remarksHtml}</td>
+        </tr>
+      `;
+    }
+    tableHtml += `
+          </tbody>
+        </table>
+      </div>
+    `;
+    document.getElementById("evaluationResultsModalBody").innerHTML = tableHtml;
+
+    // Add sorting event listeners
+    document
+      .getElementById("sort-name")
+      ?.addEventListener("click", () => sortResults("name"));
+    document
+      .getElementById("sort-z")
+      ?.addEventListener("click", () => sortResults("z"));
+    document
+      .getElementById("sort-surfElev")
+      ?.addEventListener("click", () => sortResults("surfElev"));
+    document
+      .getElementById("sort-penetration")
+      ?.addEventListener("click", () => sortResults("penetration"));
+    document
+      .getElementById("sort-remarks")
+      ?.addEventListener("click", () => sortResults("remarks"));
+  }
 
   // Create modal if not exists
   let modal = document.getElementById("evaluationResultsModal");
@@ -76,19 +160,26 @@ function showEvaluationResultsModal(results) {
     modal.className = "modal fade";
     modal.tabIndex = -1;
     modal.innerHTML = `
-      <div class="modal-dialog modal-xl">
-        <div class="modal-content">
+      <div class="modal-dialog" style="width:90vw; max-width:90vw; height:90vh; max-height:90vh;">
+        <div class="modal-content" style="height:90vh; max-height:90vh; display:flex; flex-direction:column;">
           <div class="modal-header">
             <h5 class="modal-title">Obstacle Evaluation Results</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <div class="modal-body" id="evaluationResultsModalBody"></div>
+          <div class="modal-body flex-grow-1" id="evaluationResultsModalBody" style="overflow:auto; min-height:0; height:100%;"></div>
+          <div class="modal-footer bg-light" style="position:sticky; bottom:0; z-index:10;">
+            <div class="d-flex justify-content-end gap-2 w-100">
+              <button class="btn btn-primary" disabled>Placeholder 1</button>
+              <button class="btn btn-secondary" disabled>Placeholder 2</button>
+            </div>
+          </div>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
   }
-  document.getElementById("evaluationResultsModalBody").innerHTML = tableHtml;
+
+  renderTable();
 
   // Show modal (Bootstrap 5)
   let bsModal = null;
@@ -102,3 +193,82 @@ function showEvaluationResultsModal(results) {
 
 // Export for use in other scripts
 window.showEvaluationResultsModal = showEvaluationResultsModal;
+
+// Evaluation logic moved from csv-modal.js
+document
+  .getElementById("evaluate-common-csv")
+  ?.addEventListener("click", async function () {
+    const utils = window.vss3dUtils;
+    if (
+      !utils ||
+      typeof utils.toXY !== "function" ||
+      typeof utils.pointInPolygon !== "function" ||
+      typeof utils.bilinearInterpolation !== "function"
+    ) {
+      console.error(
+        "vss3d-utils.js functions are not available. Make sure vss3d-utils.js is loaded before this script."
+      );
+      return;
+    }
+    const { toXY, pointInPolygon, bilinearInterpolation } = utils;
+
+    if (!window.lastCsvGeoJson) return;
+
+    const vssPoly3D = window.lastVssPoly3D || window.lastDepOisPoly3D;
+    if (!vssPoly3D) {
+      if (window.Swal) {
+        Swal.fire({
+          icon: "warning",
+          title: "No Surface Drawn",
+          text: "Please draw a VSS or DEP OIS surface before evaluating obstacles.",
+          confirmButtonColor: "#0d6efd",
+          background: "#fff",
+          color: "#212529",
+        });
+      } else {
+        alert(
+          "Please draw a VSS or DEP OIS surface before evaluating obstacles."
+        );
+      }
+      return;
+    }
+
+    // Convert polygon to [x, y, z]
+    const vssPoly3D_XYZ = vssPoly3D.map(([lat, lng, elev]) => {
+      const xy = toXY(lat, lng);
+      return [xy[0], xy[1], elev];
+    });
+    const vssPolyXY = vssPoly3D_XYZ.map(([x, y]) => [x, y]);
+
+    const results = [];
+    window.lastCsvGeoJson.features.forEach((feature) => {
+      const props = feature.properties || {};
+      const name = props.name || "";
+      const lat = feature.geometry.coordinates[1];
+      const lng = feature.geometry.coordinates[0];
+      const elev = props.elev;
+      const xy = toXY(lat, lng);
+      if (!xy || xy.length < 2) return;
+      const [x, y] = xy;
+      const z = elev;
+
+      if (pointInPolygon([x, y], vssPolyXY)) {
+        const surfElev = bilinearInterpolation(x, y, vssPoly3D);
+        const remarks = z > surfElev ? "Critical" : "";
+        results.push({
+          name,
+          lat,
+          lng,
+          x,
+          y,
+          z,
+          surfElev,
+          remarks,
+        });
+      }
+    });
+
+    if (results.length > 0 && window.showEvaluationResultsModal) {
+      window.showEvaluationResultsModal(results);
+    }
+  });
