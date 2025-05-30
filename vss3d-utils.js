@@ -2,12 +2,12 @@
 // Utility functions for 3D VSS surface and obstacle evaluation
 
 // Convert [lat, lng] to [x, y] NZTM (WGS84 to NZTM2000)
-export function toXY(lat, lng) {
+function toXY(lat, lng) {
   return proj4("EPSG:4326", "EPSG:2193", [lng, lat]);
 }
 
 // Point-in-polygon test (ray-casting algorithm)
-export function pointInPolygon(point, polygon) {
+function pointInPolygon(point, polygon) {
   // point: [x, y], polygon: array of [x, y]
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -26,7 +26,7 @@ export function pointInPolygon(point, polygon) {
 // Get the expected VSS surface elevation at a given [x, y] (NZTM)
 // vssPoly3D: [leftBase, leftEnd, rightEnd, rightBase, leftBase] (each [lat, lng, elev])
 // Returns null if point is outside the VSS polygon
-export function getVSSElevationAt(x, y, vssPoly3D) {
+function getVSSElevationAt(x, y, vssPoly3D) {
   // Project VSS polygon to [x, y]
   const vssXY = vssPoly3D.map(([lat, lng]) => toXY(lat, lng));
   if (!pointInPolygon([x, y], vssXY)) return null;
@@ -62,7 +62,7 @@ export function getVSSElevationAt(x, y, vssPoly3D) {
 
 // Check if an obstacle is above the VSS surface
 // obstacle: {lat, lng, elev}
-export function isObstacleAboveVSS(obstacle, vssPoly3D) {
+function isObstacleAboveVSS(obstacle, vssPoly3D) {
   const [x, y] = toXY(obstacle.lat, obstacle.lng);
   const vssElev = getVSSElevationAt(x, y, vssPoly3D);
   if (vssElev === null) return false; // outside VSS
@@ -72,7 +72,7 @@ export function isObstacleAboveVSS(obstacle, vssPoly3D) {
 // Bilinear interpolation for a quadrilateral (assumes points ordered: [A, B, C, D])
 // A: [x0, y0, z00] (leftBase), B: [x1, y1, z10] (leftEnd), C: [x2, y2, z11] (rightEnd), D: [x3, y3, z01] (rightBase)
 // Returns interpolated z at (x, y)
-export function bilinearInterpolation(x, y, vssPoly3D) {
+function bilinearInterpolation(x, y, vssPoly3D) {
   // Project corners to [x, y, z]
   const A = [...toXY(vssPoly3D[0][0], vssPoly3D[0][1]), vssPoly3D[0][2]];
   const B = [...toXY(vssPoly3D[1][0], vssPoly3D[1][1]), vssPoly3D[1][2]];
@@ -102,7 +102,7 @@ export function bilinearInterpolation(x, y, vssPoly3D) {
 
 // Plane fitting for a triangle (returns z at (x, y) for triangle [p0, p1, p2])
 // p0, p1, p2: [x, y, z]
-export function planeFitZ(x, y, p0, p1, p2) {
+function planeFitZ(x, y, p0, p1, p2) {
   // Plane: z = a*x + b*y + c
   const mat = [
     [p0[0], p0[1], 1],
@@ -137,7 +137,7 @@ export function planeFitZ(x, y, p0, p1, p2) {
 
 // Barycentric interpolation for a triangle (returns z at (x, y) for triangle [p0, p1, p2])
 // p0, p1, p2: [x, y, z]
-export function barycentricZ(x, y, p0, p1, p2) {
+function barycentricZ(x, y, p0, p1, p2) {
   // Compute barycentric coordinates
   const denom =
     (p1[1] - p2[1]) * (p0[0] - p2[0]) + (p2[0] - p1[0]) * (p0[1] - p2[1]);

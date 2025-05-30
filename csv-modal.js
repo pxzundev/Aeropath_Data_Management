@@ -407,58 +407,61 @@ function parseLatLng(str) {
 document
   .getElementById("evaluate-common-csv")
   ?.addEventListener("click", async function () {
-    // Load vss3d-utils functions (assumes module is loaded globally or via import)
-    // If using modules, you may need to import or expose these functions to window
-    const { toXY, pointInPolygon, getVSSElevationAt } = window.vss3dUtils || {};
-
-    if (!window.lastCsvGeoJson) {
-      console.log("No CSV GeoJSON loaded.");
+    const utils = window.vss3dUtils;
+    if (
+      !utils ||
+      typeof utils.toXY !== "function" ||
+      typeof utils.pointInPolygon !== "function" ||
+      typeof utils.bilinearInterpolation !== "function"
+    ) {
+      console.error(
+        "vss3d-utils.js functions are not available. Make sure vss3d-utils.js is loaded before this script."
+      );
       return;
     }
+    const { toXY, pointInPolygon, bilinearInterpolation } = utils;
 
-    // Choose which polygon to use (VSS or DEP OIS)
-    // You must set window.lastVssPoly3D or window.lastDepOisPoly3D when drawing the surface
+    if (!window.lastCsvGeoJson) return;
+
     const vssPoly3D = window.lastVssPoly3D || window.lastDepOisPoly3D;
-    if (!vssPoly3D) {
-      console.log("No VSS or DEP OIS polygon available.");
-      return;
-    }
+    if (!vssPoly3D) return;
 
     // Convert polygon to [x, y, z]
     const vssPoly3D_XYZ = vssPoly3D.map(([lat, lng, elev]) => {
-      const [x, y] = toXY(lat, lng);
-      return [x, y, elev];
+      const xy = toXY(lat, lng);
+      return [xy[0], xy[1], elev];
     });
-
-    // Project polygon to [x, y] for pointInPolygon
     const vssPolyXY = vssPoly3D_XYZ.map(([x, y]) => [x, y]);
 
-    // Evaluate each obstacle
-    window.lastCsvGeoJson.features.forEach((feature, idx) => {
+    const results = [];
+    window.lastCsvGeoJson.features.forEach((feature) => {
       const props = feature.properties || {};
+      const name = props.name || "";
       const lat = feature.geometry.coordinates[1];
       const lng = feature.geometry.coordinates[0];
       const elev = props.elev;
-      const [x, y] = toXY(lat, lng);
+      const xy = toXY(lat, lng);
+      if (!xy || xy.length < 2) return;
+      const [x, y] = xy;
       const z = elev;
 
-      console.log(
-        `Obstacle #${
-          idx + 1
-        }: lat=${lat}, lng=${lng}, elev=${elev} -> x=${x}, y=${y}, z=${z}`
-      );
-
-      // Check if inside polygon
-      const inside = pointInPolygon([x, y], vssPolyXY);
-      console.log(`  Inside polygon: ${inside}`);
-
-      if (inside) {
-        // Get surface elevation at (x, y)
-        const surfElev = getVSSElevationAt(x, y, vssPoly3D);
-        console.log(`  Surface elevation at obstacle: ${surfElev}`);
-        // Optionally, check if obstacle is above surface
-        const above = z > surfElev;
-        console.log(`  Obstacle above surface: ${above}`);
+      if (pointInPolygon([x, y], vssPolyXY)) {
+        const surfElev = bilinearInterpolation(x, y, vssPoly3D);
+        const remarks = z > surfElev ? "Critical" : "";
+        results.push({
+          name,
+          lat,
+          lng,
+          x,
+          y,
+          z,
+          surfElev,
+          remarks,
+        });
       }
     });
+
+    if (results.length > 0 && window.showEvaluationResultsModal) {
+      window.showEvaluationResultsModal(results);
+    }
   });
