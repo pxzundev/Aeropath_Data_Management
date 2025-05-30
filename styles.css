@@ -2,7 +2,8 @@ html {
   font-size: 0.75rem;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   margin: 0;
   padding: 0;
@@ -42,4 +43,9 @@ body {
 
 .container.mt-5 {
   display: none;
+}
+
+/* Match the border color of the redefine button to the file input */
+#common-csv-redefine {
+  border-color: var(--bs-border-color, #ced4da) !important;
 }

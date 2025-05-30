@@ -1,3 +1,216 @@
+let aerodromeRunways = {};
+let allAerodromes = [];
+async function populateAerodromeSelect() {
+  const select = document.getElementById("aerodrome");
+  select.innerHTML = '<option value="">Select Aerodrome</option>';
+  const thrSelect = document.getElementById("runwaythr");
+  const endSelect = document.getElementById("runwayend");
+  const depRwyThr = document.getElementById("dep-rwythr");
+  const depStartRwy = document.getElementById("dep-startrwy");
+  if (thrSelect) thrSelect.innerHTML = '<option value="">THR</option>';
+  if (endSelect) endSelect.innerHTML = '<option value="">END</option>';
+  if (depRwyThr) depRwyThr.innerHTML = '<option value="">END</option>';
+  if (depStartRwy) depStartRwy.innerHTML = '<option value="">START</option>';
+  try {
+    allAerodromes = await window.getUniqueAerodromeICAOs();
+    allAerodromes.sort();
+    aerodromeRunways = await window.getAerodromeRunways();
+    for (const icao of allAerodromes) {
+      const opt = document.createElement("option");
+      opt.value = icao;
+      opt.textContent = icao;
+      select.appendChild(opt);
+    }
+  } catch (e) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "Error loading aerodromes";
+    select.appendChild(opt);
+  }
+}
+document.getElementById("aerodrome").addEventListener("change", function () {
+  window.plotRunwaysForAerodrome(this.value, window.map);
+  const icao = this.value;
+  const thrSelect = document.getElementById("runwaythr");
+  const endSelect = document.getElementById("runwayend");
+  const depRwyThr = document.getElementById("dep-rwythr");
+  const depStartRwy = document.getElementById("dep-startrwy");
+  if (thrSelect) thrSelect.innerHTML = '<option value="">THR</option>';
+  if (endSelect) endSelect.innerHTML = '<option value="">END</option>';
+  if (depRwyThr) depRwyThr.innerHTML = '<option value="">END</option>';
+  if (depStartRwy) depStartRwy.innerHTML = '<option value="">START</option>';
+  if (icao && aerodromeRunways[icao]) {
+    for (const rwy of aerodromeRunways[icao]) {
+      if (thrSelect) {
+        const opt1 = document.createElement("option");
+        opt1.value = rwy;
+        opt1.textContent = rwy;
+        thrSelect.appendChild(opt1);
+      }
+      if (endSelect) {
+        const opt2 = document.createElement("option");
+        opt2.value = rwy;
+        opt2.textContent = rwy;
+        endSelect.appendChild(opt2);
+      }
+      if (depRwyThr) {
+        const opt3 = document.createElement("option");
+        opt3.value = rwy;
+        opt3.textContent = rwy;
+        depRwyThr.appendChild(opt3);
+      }
+      if (depStartRwy) {
+        const opt4 = document.createElement("option");
+        opt4.value = rwy;
+        opt4.textContent = rwy;
+        depStartRwy.appendChild(opt4);
+      }
+    }
+  }
+});
+document
+  .getElementById("refresh-aerodrome")
+  .addEventListener("click", function () {
+    populateAerodromeSelect();
+    // Remove any runway markers from the map
+    if (window.runwayMarkers && window.runwayMarkers.length && window.map) {
+      window.runwayMarkers.forEach((m) => window.map.removeLayer(m));
+      window.runwayMarkers = [];
+    }
+  });
+
+// Helper to check and calculate bearing if both THR and END are selected
+function tryCalculateRwyBearingFromInputs() {
+  const thrLat = parseFloat(document.getElementById("thr-lat").value);
+  const thrLng = parseFloat(document.getElementById("thr-lng").value);
+  const endLat = parseFloat(document.getElementById("rwyend-lat").value);
+  const endLng = parseFloat(document.getElementById("rwyend-lng").value);
+  if (!isNaN(thrLat) && !isNaN(thrLng) && !isNaN(endLat) && !isNaN(endLng)) {
+    calculateRwyBearing(thrLat, thrLng, endLat, endLng);
+  }
+}
+
+// Helper to draw runway line if both THR and END are selected and have coordinates
+function drawRunwayLineFromSelects() {
+  const thrLat = parseFloat(document.getElementById("thr-lat").value);
+  const thrLng = parseFloat(document.getElementById("thr-lng").value);
+  const endLat = parseFloat(document.getElementById("rwyend-lat").value);
+  const endLng = parseFloat(document.getElementById("rwyend-lng").value);
+  if (!isNaN(thrLat) && !isNaN(thrLng) && !isNaN(endLat) && !isNaN(endLng)) {
+    if (window.runwayLine) {
+      window.map.removeLayer(window.runwayLine);
+    }
+    window.runwayLine = L.polyline(
+      [
+        [thrLat, thrLng],
+        [endLat, endLng],
+      ],
+      { color: "blue", weight: 3, dashArray: "5, 10" }
+    ).addTo(window.map);
+  }
+}
+
+// Call drawRunwayLineFromSelects when either runwaythr or runwayend changes
+["runwaythr", "runwayend"].forEach((id) => {
+  document
+    .getElementById(id)
+    .addEventListener("change", drawRunwayLineFromSelects);
+});
+// Also call when lat/lng fields are updated
+["thr-lat", "thr-lng", "rwyend-lat", "rwyend-lng"].forEach((id) => {
+  document
+    .getElementById(id)
+    .addEventListener("input", drawRunwayLineFromSelects);
+});
+
+document
+  .getElementById("runwaythr")
+  .addEventListener("change", async function () {
+    const icao = document.getElementById("aerodrome").value;
+    const rwyName = this.value;
+    if (!icao || !rwyName) return;
+    // Fetch and parse runways.csv
+    const response = await fetch("data/runways.csv");
+    const text = await response.text();
+    const lines = text.split(/\r?\n/).filter(Boolean);
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(",");
+      if (
+        cols.length >= 17 &&
+        cols[16].trim() === icao &&
+        cols[0].trim() === rwyName
+      ) {
+        // Latitude (WGS84) col 5, Longitude (WGS84) col 6, Elevation col 3
+        const latStr = cols[5].replace("S", "-").replace("N", "").trim();
+        const lngStr = cols[6].replace("E", "").replace("W", "-").trim();
+        const elevStr = cols[3].trim();
+        document.getElementById("thr-lat").value = parseFloat(latStr) || "";
+        document.getElementById("thr-lng").value = parseFloat(lngStr) || "";
+        document.getElementById("rwyelev").value = parseFloat(elevStr) || "";
+        break;
+      }
+    }
+    tryCalculateRwyBearingFromInputs();
+    if (typeof drawRunwayLine === "function") drawRunwayLine();
+  });
+document
+  .getElementById("runwayend")
+  .addEventListener("change", async function () {
+    const icao = document.getElementById("aerodrome").value;
+    const rwyName = this.value;
+    if (!icao || !rwyName) return;
+    // Fetch and parse runways.csv
+    const response = await fetch("data/runways.csv");
+    const text = await response.text();
+    const lines = text.split(/\r?\n/).filter(Boolean);
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(",");
+      if (
+        cols.length >= 17 &&
+        cols[16].trim() === icao &&
+        cols[0].trim() === rwyName
+      ) {
+        // Latitude (WGS84) col 5, Longitude (WGS84) col 6, Elevation col 3
+        const latStr = cols[5].replace("S", "-").replace("N", "").trim();
+        const lngStr = cols[6].replace("E", "").replace("W", "-").trim();
+        const elevStr = cols[3].trim();
+        document.getElementById("rwyend-lat").value = parseFloat(latStr) || "";
+        document.getElementById("rwyend-lng").value = parseFloat(lngStr) || "";
+        document.getElementById("rwyendelev").value = parseFloat(elevStr) || "";
+        break;
+      }
+    }
+    tryCalculateRwyBearingFromInputs();
+    if (typeof drawRunwayLine === "function") drawRunwayLine();
+  });
+
+document.getElementById("runwaycode").addEventListener("change", function () {
+  const stripInput = document.getElementById("strip");
+  const code = this.options[this.selectedIndex].text;
+  if (code.includes("1, 2")) {
+    stripInput.value = 140;
+  } else if (code.includes("3, 4")) {
+    stripInput.value = 280;
+  }
+});
+
+// Show/hide VSS or DEP OIS form based on Surface Type selector
+const surfaceTypeSelect = document.getElementById("surface-type");
+const vssFormCard = document.getElementById("vss-form-card");
+const depOisFormCard = document.getElementById("dep-ois-form-card");
+function updateFormVisibility() {
+  if (surfaceTypeSelect.value === "dep_ois") {
+    vssFormCard.classList.add("d-none");
+    depOisFormCard.classList.remove("d-none");
+  } else {
+    vssFormCard.classList.remove("d-none");
+    depOisFormCard.classList.add("d-none");
+  }
+}
+surfaceTypeSelect.addEventListener("change", updateFormVisibility);
+window.addEventListener("DOMContentLoaded", updateFormVisibility);
+
+window.addEventListener("DOMContentLoaded", populateAerodromeSelect);
 // Helper: Convert degrees to radians
 function toRad(deg) {
   return (deg * Math.PI) / 180;
@@ -87,8 +300,8 @@ function vssToKML(vssPoly3D) {
 
 // Add KML export functionality for DEP OIS
 function depOisToKML(depOisPoly3D) {
-  // depOisPoly3D: [baseRight, leftEnd, rightEnd, baseLeft, baseRight]
-  const [baseRight, leftEnd, rightEnd, baseLeft] = depOisPoly3D;
+  // depOisPoly3D: [baseLeft, leftEnd, rightEnd, baseRight, baseLeft]
+  const [baseLeft, leftEnd, rightEnd, baseRight] = depOisPoly3D;
   const vertexNames = ["", "", "", ""];
   const vertexIcons = [
     "http://maps.google.com/mapfiles/kml/paddle/A.png",
@@ -205,16 +418,16 @@ document.getElementById("vss-form").addEventListener("submit", function (e) {
   const offset =
     -1 * parseFloat(document.getElementById("offsetangle").value) || 0;
   let leftSplay, rightSplay;
-  // If offset is negative, the offset should be to the left when facing away from the runway (i.e., baseLeft)
+  // If offset is negative, splay with offset should be on the left side of the rwycl when approaching the runway threshold
   if (offset < 0) {
-    leftSplay = splayAngle + Math.abs(offset); // more negative = more left
-    rightSplay = -splayAngle;
+    leftSplay = offset - splayAngle;
+    rightSplay = splayAngle;
   } else if (offset > 0) {
-    leftSplay = splayAngle;
-    rightSplay = -splayAngle - Math.abs(offset); // more positive = more right
+    rightSplay = offset + splayAngle;
+    leftSplay = -splayAngle;
   } else {
-    leftSplay = splayAngle;
-    rightSplay = -splayAngle;
+    leftSplay = -splayAngle;
+    rightSplay = splayAngle;
   }
 
   console.log("Left splay:", leftSplay);
@@ -431,8 +644,10 @@ if (depOisForm) {
     const endLng = parseFloat(document.getElementById("dep-end-lng").value);
     const cwyLength =
       parseFloat(document.getElementById("cwy-length").value) || 0;
+    // Use the value from the dep-offset input field, negative = left, positive = right
     const offset =
       -1 * parseFloat(document.getElementById("dep-offset").value) || 0;
+    // Validation
     if (
       !isFinite(startLat) ||
       !isFinite(startLng) ||
@@ -467,12 +682,13 @@ if (depOisForm) {
       }
       return;
     }
+    // Remove previous polygon if present
     if (window.depOisPoly) {
       window.map.removeLayer(window.depOisPoly);
     }
     // Geometry constants
     const baseWidth = 300; // meters
-    const length = 5000; // meters (measured along centerline)
+    const length = 5000; // meters
     const splayDeg = 15;
     // Convert to x/y (NZTM)
     const startXY = toXY(startLat, startLng);
@@ -491,6 +707,8 @@ if (depOisForm) {
         endXY[0] + cwyLength * Math.sin(rwyBrg),
         endXY[1] + cwyLength * Math.cos(rwyBrg),
       ];
+      // Elevation at base origin is still rwyend elev + 5m
+      // (CWY is flat, not sloped)
     }
 
     // Base corners (perpendicular to centerline)
@@ -505,7 +723,6 @@ if (depOisForm) {
 
     // Splay angles (match VSS logic)
     let leftSplay, rightSplay;
-    // If offset is negative, the offset should be to the left when facing away from the runway (i.e., baseLeft)
     if (offset < 0) {
       leftSplay = splayDeg + Math.abs(offset); // more negative = more left
       rightSplay = -splayDeg;
@@ -519,7 +736,6 @@ if (depOisForm) {
     // Splay angles in radians
     const leftSplayRad = toRad(leftSplay);
     const rightSplayRad = toRad(rightSplay);
-
     // End corners (projected from base corners, using splay angles and hypotenuse)
     // The end line is always perpendicular to the centerline, but the splay determines how far out the end corners are
     // Calculate hypotenuse for each splay
@@ -537,10 +753,14 @@ if (depOisForm) {
     ];
 
     // Calculate elevations for DEP OIS vertices using 2.5% slope along centerline
+    // Base elevation is rwyend elev + 5m
+    // End elevation is base elevation + (5000m * 0.025)
     const depBaseElev = baseOriginElev;
-    const depEndElev = depBaseElev + length * 0.025;
+    const depEndElev = depBaseElev + 5000 * 0.025;
 
     // Vertices with elevation: [lat, lng, elev]
+    // baseRight3D and baseLeft3D use depBaseElev
+    // leftEnd3D and rightEnd3D use depEndElev
     const baseLeft = toLatLng(baseLeftXY[0], baseLeftXY[1]);
     const baseRight = toLatLng(baseRightXY[0], baseRightXY[1]);
     const leftEnd = toLatLng(leftEndXY[0], leftEndXY[1]);
@@ -550,7 +770,7 @@ if (depOisForm) {
     const rightEnd3D = [rightEnd[0], rightEnd[1], depEndElev];
     const baseLeft3D = [baseLeft[0], baseLeft[1], depBaseElev];
 
-    // Store for export (order: baseLeft, leftEnd, rightEnd, baseRight, baseLeft)
+    // Store for export (order: baseRight, leftEnd, rightEnd, baseLeft, baseRight)
     window.lastDepOisPoly3D = [
       baseLeft3D,
       leftEnd3D,
@@ -561,12 +781,12 @@ if (depOisForm) {
 
     // Log the vertices as [lat, lng, elev]
     console.log("DEP OIS vertices (lat, lng, elev):", [
-      baseLeft3D,
+      baseRight3D,
       leftEnd3D,
       rightEnd3D,
-      baseRight3D,
+      baseLeft3D,
     ]);
-    // Polygon: baseLeft -> leftEnd -> rightEnd -> baseRight -> baseLeft
+    // Polygon: baseRight -> leftEnd -> rightEnd -> baseLeft -> baseRight
     const depOisPolyLatLngs = [
       [baseLeft[0], baseLeft[1]],
       [leftEnd[0], leftEnd[1]],
@@ -582,14 +802,14 @@ if (depOisForm) {
     // Fit map to bounds of the DEP OIS polygon (same as VSS logic)
     window.map.fitBounds(window.depOisPoly.getBounds(), { padding: [20, 20] });
 
-    // Add markers for each DEP OIS polygon vertex (A: baseLeft, B: leftEnd, C: rightEnd, D: baseRight)
+    // Add markers for each DEP OIS polygon vertex (A: baseRight, B: leftEnd, C: rightEnd, D: baseLeft)
     if (window.depOisMarkers) {
       window.depOisMarkers.forEach((marker) => {
         window.map.removeLayer(marker);
       });
     }
     const depOisMarkerLabels = ["A", "B", "C", "D"];
-    const depOisVertices = [baseLeft, leftEnd, rightEnd, baseRight];
+    const depOisVertices = [baseRight, leftEnd, rightEnd, baseLeft];
     const depOisIcon = L.icon({
       iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
       iconSize: [18, 30],
@@ -1201,6 +1421,3 @@ depOisToggleBtn.addEventListener("click", function () {
     }
   }
 });
-
-// Refactored DEP OIS polygon logic to match VSS geometric approach
-// Calculate hypotenuse for each splay, then compute end points from base corners using hypotenuse and splay direction. This ensures the DEP OIS shape is constructed identically to VSS except for its unique parameters.
