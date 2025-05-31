@@ -106,6 +106,21 @@ function showCsvPreviewModal(csvText, modalTitle = "CSV Preview") {
   document.getElementById("csvPreviewModalBody").innerHTML =
     tableHtml + dropdownsHtml;
 
+  // Set default values for dropdowns after rendering
+  setTimeout(() => {
+    const colLetters = header.map((_, i) => String.fromCharCode(65 + i));
+    // Set to A, F, G, C if those columns exist, else fallback to first available
+    const setDropdown = (id, letter) => {
+      const el = document.getElementById(id);
+      const idx = colLetters.indexOf(letter);
+      if (el && idx !== -1) el.value = idx;
+    };
+    setDropdown("csv-col-name", "A");
+    setDropdown("csv-col-lat", "F");
+    setDropdown("csv-col-lng", "G");
+    setDropdown("csv-col-elev", "C");
+  }, 0);
+
   // Show modal (Bootstrap 5)
   let bsModal = null;
   if (window.bootstrap) {
