@@ -214,6 +214,7 @@ document
           icon: "error",
           title: "Script Error",
           text: "Utility functions for evaluation are missing. Please check console.",
+          confirmButtonColor: "#0d6efd",
         });
       } else {
         alert(
@@ -236,9 +237,11 @@ document
           icon: "info",
           title: "No CSV Data",
           text: "Please upload a CSV file with obstacles first.",
+          confirmButtonColor: "#0d6efd",
         });
       } else {
-        alert("Please upload a CSV file with obstacles first.");
+        // Fallback if SweetAlert2 is not available
+        window.alert("Please upload a CSV file with obstacles first.");
       }
       return;
     }
@@ -256,6 +259,7 @@ document
             icon: "warning",
             title: "No DEP OIS Surface",
             text: "Please draw a DEP OIS surface first.",
+            confirmButtonColor: "#0d6efd",
           });
         } else {
           alert("Please draw a DEP OIS surface first.");
@@ -268,9 +272,10 @@ document
         );
         if (window.Swal) {
           Swal.fire({
-            icon: "error",
+            icon: "warning",
             title: "DEP OIS Error",
             text: "DEP OIS polygon is invalid for evaluation (needs 3+ points).",
+            confirmButtonColor: "#0d6efd",
           });
         } else {
           alert("DEP OIS polygon is invalid for evaluation (needs 3+ points).");
@@ -294,6 +299,7 @@ document
             icon: "warning",
             title: "No VSS Surface",
             text: "Please draw a VSS surface first.",
+            confirmButtonColor: "#0d6efd",
           });
         } else {
           alert("Please draw a VSS surface first.");
