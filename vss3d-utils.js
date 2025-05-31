@@ -26,6 +26,9 @@ function pointInPolygon(point, polygon) {
 // Get the expected VSS surface elevation at a given [x, y] (NZTM)
 // vssPoly3D: [leftBase, leftEnd, rightEnd, rightBase, leftBase] (each [lat, lng, elev])
 // Returns null if point is outside the VSS polygon
+// IMPORTANT: This function assumes a VSS-like geometry where elevation is interpolated along a centerline.
+// It may not be suitable for other surface types like a simple planar DEP OIS.
+// For a generic planar quadrilateral, consider using bilinearInterpolation.
 function getVSSElevationAt(x, y, vssPoly3D) {
   // Project VSS polygon to [x, y]
   const vssXY = vssPoly3D.map(([lat, lng]) => toXY(lat, lng));
@@ -64,9 +67,100 @@ function getVSSElevationAt(x, y, vssPoly3D) {
 // obstacle: {lat, lng, elev}
 function isObstacleAboveVSS(obstacle, vssPoly3D) {
   const [x, y] = toXY(obstacle.lat, obstacle.lng);
-  const vssElev = getVSSElevationAt(x, y, vssPoly3D);
+  const vssElev = getVSSElevationAt(x, y, vssPoly3D); // This call uses the VSS-specific logic
   if (vssElev === null) return false; // outside VSS
   return obstacle.elev > vssElev;
+}
+
+// Check if an obstacle is above the DEP OIS surface using plane fitting
+// obstacle: {lat, lng, elev}
+// depOisPoly3D: 3D polygon of the DEP OIS, typically [baseLeft, endLeft, endRight, baseRight, baseLeft (optional)].
+// We will use the first three distinct points to define the plane, assuming it's planar.
+function isObstacleAboveDepOIS(obstacle, depOisPoly3D) {
+  const [obsX, obsY] = toXY(obstacle.lat, obstacle.lng);
+
+  // Project DEP OIS polygon to 2D for point-in-polygon test
+  const depOisXY = depOisPoly3D.map(([lat, lng]) => toXY(lat, lng));
+  if (!pointInPolygon([obsX, obsY], depOisXY)) {
+    return false; // Obstacle is outside the horizontal bounds of the DEP OIS
+  }
+
+  // Define the plane of the DEP OIS using three of its corners.
+  // Ensure these points are in [x, y, z] format for planeFitZ.
+  // Using baseLeft, endLeft, and baseRight (assuming depOisPoly3D[0], [1], [3])
+  // This assumes depOisPoly3D has at least 4 points if using index 3.
+  if (depOisPoly3D.length < 3) {
+    console.error(
+      "DEP OIS polygon must have at least 3 points to define a plane."
+    );
+    return false;
+  }
+
+  const p0_xyz = [
+    ...toXY(depOisPoly3D[0][0], depOisPoly3D[0][1]),
+    depOisPoly3D[0][2],
+  ]; // e.g., baseLeft
+  const p1_xyz = [
+    ...toXY(depOisPoly3D[1][0], depOisPoly3D[1][1]),
+    depOisPoly3D[1][2],
+  ]; // e.g., endLeft
+  // Choose the third point carefully to ensure non-collinearity.
+  // If depOisPoly3D is [baseLeft, endLeft, endRight, baseRight], then depOisPoly3D[3] is baseRight.
+  // Or, if it's just the four corners without closing, depOisPoly3D[2] is endRight.
+  // Let's use depOisPoly3D[2] (e.g. endRight) as the third point for the plane definition.
+  const p2_xyz = [
+    ...toXY(depOisPoly3D[2][0], depOisPoly3D[2][1]),
+    depOisPoly3D[2][2],
+  ]; // e.g., endRight
+
+  const surfaceElev = planeFitZ(obsX, obsY, p0_xyz, p1_xyz, p2_xyz);
+
+  if (surfaceElev === null) {
+    // This might happen if planeFitZ fails (e.g., collinear points)
+    console.warn(
+      "Could not determine DEP OIS surface elevation at obstacle location (planeFitZ failed).",
+      { obsX, obsY, p0_xyz, p1_xyz, p2_xyz }
+    );
+    return false; // For safety, consider it not penetrating if elevation cannot be determined.
+  }
+
+  return obstacle.elev > surfaceElev;
+}
+
+// Get the expected DEP OIS surface elevation at a given [x, y] (NZTM)
+// depOisPoly3D: [baseLeft, endLeft, endRight, baseRight, baseLeft (optional)] (each [lat, lng, elev])
+// Returns null if point is outside the DEP OIS polygon
+function getDepElevationAt(x, y, depOisPoly3D) {
+  // Project DEP OIS polygon to [x, y]
+  const depOisXY = depOisPoly3D.map(([lat, lng]) => toXY(lat, lng));
+  if (!pointInPolygon([x, y], depOisXY)) return null;
+
+  // Get base and end midpoints in [x, y]
+  const baseLeft = toXY(depOisPoly3D[0][0], depOisPoly3D[0][1]);
+  const baseRight = toXY(depOisPoly3D[3][0], depOisPoly3D[3][1]);
+  const endLeft = toXY(depOisPoly3D[1][0], depOisPoly3D[1][1]);
+  const endRight = toXY(depOisPoly3D[2][0], depOisPoly3D[2][1]);
+  const baseMid = [
+    (baseLeft[0] + baseRight[0]) / 2,
+    (baseLeft[1] + baseRight[1]) / 2,
+  ];
+  const endMid = [
+    (endLeft[0] + endRight[0]) / 2,
+    (endLeft[1] + endRight[1]) / 2,
+  ];
+  const baseElev = (depOisPoly3D[0][2] + depOisPoly3D[3][2]) / 2;
+  const endElev = (depOisPoly3D[1][2] + depOisPoly3D[2][2]) / 2;
+
+  // Project (x, y) onto centerline to get fraction along
+  const dx = endMid[0] - baseMid[0];
+  const dy = endMid[1] - baseMid[1];
+  const length = Math.sqrt(dx * dx + dy * dy);
+  if (length === 0) return baseElev;
+  const t = ((x - baseMid[0]) * dx + (y - baseMid[1]) * dy) / (length * length);
+  // Clamp t to [0, 1]
+  const tClamped = Math.max(0, Math.min(1, t));
+  // Linear interpolation of elevation
+  return baseElev + (endElev - baseElev) * tClamped;
 }
 
 // Bilinear interpolation for a quadrilateral (assumes points ordered: [A, B, C, D])
@@ -150,15 +244,54 @@ function barycentricZ(x, y, p0, p1, p2) {
   return w1 * p0[2] + w2 * p1[2] + w3 * p2[2];
 }
 
+// Get the expected DEP OIS surface elevation at a given [x, y] (NZTM)
+// depOisPoly3D: [baseLeft, endLeft, endRight, baseRight, baseLeft (optional)] (each [lat, lng, elev])
+// Returns null if point is outside the DEP OIS polygon
+function getDepOISElevationAt(x, y, depOisPoly3D) {
+  // Project DEP OIS polygon to [x, y]
+  const depOisXY = depOisPoly3D.map(([lat, lng]) => toXY(lat, lng));
+  if (!pointInPolygon([x, y], depOisXY)) return null;
+
+  // Get base and end midpoints in [x, y]
+  const baseLeft = toXY(depOisPoly3D[0][0], depOisPoly3D[0][1]);
+  const baseRight = toXY(depOisPoly3D[3][0], depOisPoly3D[3][1]);
+  const endLeft = toXY(depOisPoly3D[1][0], depOisPoly3D[1][1]);
+  const endRight = toXY(depOisPoly3D[2][0], depOisPoly3D[2][1]);
+  const baseMid = [
+    (baseLeft[0] + baseRight[0]) / 2,
+    (baseLeft[1] + baseRight[1]) / 2,
+  ];
+  const endMid = [
+    (endLeft[0] + endRight[0]) / 2,
+    (endLeft[1] + endRight[1]) / 2,
+  ];
+  const baseElev = (depOisPoly3D[0][2] + depOisPoly3D[3][2]) / 2;
+  const endElev = (depOisPoly3D[1][2] + depOisPoly3D[2][2]) / 2;
+
+  // Project (x, y) onto centerline to get fraction along
+  const dx = endMid[0] - baseMid[0];
+  const dy = endMid[1] - baseMid[1];
+  const length = Math.sqrt(dx * dx + dy * dy);
+  if (length === 0) return baseElev;
+  const t = ((x - baseMid[0]) * dx + (y - baseMid[1]) * dy) / (length * length);
+  // Clamp t to [0, 1]
+  const tClamped = Math.max(0, Math.min(1, t));
+  // Linear interpolation of elevation
+  return baseElev + (endElev - baseElev) * tClamped;
+}
+
 // At the end of the file, expose functions for global use (if not using modules)
 if (typeof window !== "undefined") {
   window.vss3dUtils = {
     toXY,
     pointInPolygon,
     getVSSElevationAt,
+    getDepElevationAt,
     isObstacleAboveVSS,
+    isObstacleAboveDepOIS, // Add the new function here
     bilinearInterpolation,
     planeFitZ,
     barycentricZ,
+    getDepOISElevationAt,
   };
 }

@@ -203,72 +203,200 @@ document
       !utils ||
       typeof utils.toXY !== "function" ||
       typeof utils.pointInPolygon !== "function" ||
-      typeof utils.bilinearInterpolation !== "function"
+      typeof utils.getVSSElevationAt !== "function" || // Needed for VSS
+      typeof utils.planeFitZ !== "function" // Needed for DEP OIS
     ) {
       console.error(
-        "vss3d-utils.js functions are not available. Make sure vss3d-utils.js is loaded before this script."
+        "Required vss3d-utils.js functions are not available. Ensure vss3d-utils.js is loaded and vss3dUtils is exposed globally."
       );
-      return;
-    }
-    const { toXY, pointInPolygon, bilinearInterpolation } = utils;
-
-    if (!window.lastCsvGeoJson) return;
-
-    const vssPoly3D = window.lastVssPoly3D || window.lastDepOisPoly3D;
-    if (!vssPoly3D) {
       if (window.Swal) {
         Swal.fire({
-          icon: "warning",
-          title: "No Surface Drawn",
-          text: "Please draw a VSS or DEP OIS surface before evaluating obstacles.",
-          confirmButtonColor: "#0d6efd",
-          background: "#fff",
-          color: "#212529",
+          icon: "error",
+          title: "Script Error",
+          text: "Utility functions for evaluation are missing. Please check console.",
         });
       } else {
         alert(
-          "Please draw a VSS or DEP OIS surface before evaluating obstacles."
+          "Utility functions for evaluation are missing. Please check console."
         );
       }
       return;
     }
+    const {
+      toXY,
+      pointInPolygon,
+      getVSSElevationAt,
+      planeFitZ,
+      getDepElevationAt,
+    } = utils;
 
-    // Convert polygon to [x, y, z]
-    const vssPoly3D_XYZ = vssPoly3D.map(([lat, lng, elev]) => {
-      const xy = toXY(lat, lng);
-      return [xy[0], xy[1], elev];
-    });
-    const vssPolyXY = vssPoly3D_XYZ.map(([x, y]) => [x, y]);
+    if (!window.lastCsvGeoJson) {
+      if (window.Swal) {
+        Swal.fire({
+          icon: "info",
+          title: "No CSV Data",
+          text: "Please upload a CSV file with obstacles first.",
+        });
+      } else {
+        alert("Please upload a CSV file with obstacles first.");
+      }
+      return;
+    }
+
+    const surfaceTypeSelect = document.getElementById("surface-type");
+    let activeSurfacePoly3D;
+    let evaluationMode; // "vss" or "dep_ois"
+
+    if (surfaceTypeSelect && surfaceTypeSelect.value === "dep_ois") {
+      activeSurfacePoly3D = window.lastDepOisPoly3D;
+      evaluationMode = "dep_ois";
+      if (!activeSurfacePoly3D) {
+        if (window.Swal) {
+          Swal.fire({
+            icon: "warning",
+            title: "No DEP OIS Surface",
+            text: "Please draw a DEP OIS surface first.",
+          });
+        } else {
+          alert("Please draw a DEP OIS surface first.");
+        }
+        return;
+      }
+      if (activeSurfacePoly3D.length < 3) {
+        console.error(
+          "DEP OIS polygon must have at least 3 points to define a plane for evaluation."
+        );
+        if (window.Swal) {
+          Swal.fire({
+            icon: "error",
+            title: "DEP OIS Error",
+            text: "DEP OIS polygon is invalid for evaluation (needs 3+ points).",
+          });
+        } else {
+          alert("DEP OIS polygon is invalid for evaluation (needs 3+ points).");
+        }
+        return;
+      }
+      // Debug: log the input polygon and projected coordinates
+      console.log("DEP OIS polygon (lat,lng,elev):", activeSurfacePoly3D);
+      const depOisPoly3D_XYZ = activeSurfacePoly3D.map(([lat, lng, elev]) => {
+        const xy = toXY(lat, lng);
+        return [xy[0], xy[1], elev];
+      });
+      console.log("DEP OIS polygon projected (x,y,z):", depOisPoly3D_XYZ);
+    } else {
+      // Default to VSS or if surfaceTypeSelect is not found
+      activeSurfacePoly3D = window.lastVssPoly3D;
+      evaluationMode = "vss";
+      if (!activeSurfacePoly3D) {
+        if (window.Swal) {
+          Swal.fire({
+            icon: "warning",
+            title: "No VSS Surface",
+            text: "Please draw a VSS surface first.",
+          });
+        } else {
+          alert("Please draw a VSS surface first.");
+        }
+        return;
+      }
+    }
+
+    // Convert active surface polygon to [x, y, z] for planeFitZ if needed, and [x,y] for pointInPolygon
+    const activeSurfacePoly3D_XYZ = activeSurfacePoly3D.map(
+      ([lat, lng, elev]) => {
+        const xy = toXY(lat, lng);
+        return [xy[0], xy[1], elev];
+      }
+    );
+    const activeSurfacePolyXY = activeSurfacePoly3D_XYZ.map(([x, y]) => [x, y]);
 
     const results = [];
     window.lastCsvGeoJson.features.forEach((feature) => {
       const props = feature.properties || {};
-      const name = props.name || "";
+      // Attempt to read common variations of name and elevation properties
+      const name =
+        props.name || props.Name || props.NAME || props.OBJECT_NAM || "";
       const lat = feature.geometry.coordinates[1];
       const lng = feature.geometry.coordinates[0];
-      const elev = props.elev;
-      const xy = toXY(lat, lng);
-      if (!xy || xy.length < 2) return;
-      const [x, y] = xy;
-      const z = elev;
+      const elev =
+        props.elev ??
+        props.elevation ??
+        props.ALT_m ??
+        props.ALT ??
+        props.Altitude ??
+        props.ELEVATION ??
+        props.HEIGHT ??
+        null;
 
-      if (pointInPolygon([x, y], vssPolyXY)) {
-        const surfElev = bilinearInterpolation(x, y, vssPoly3D);
-        const remarks = z > surfElev ? "Critical" : "";
+      if (
+        typeof lat !== "number" ||
+        typeof lng !== "number" ||
+        typeof elev !== "number" ||
+        elev === null
+      ) {
+        console.warn(
+          "Skipping obstacle with invalid/missing coordinates or elevation:",
+          feature
+        );
+        return;
+      }
+
+      const obstacleCoordsXY = toXY(lat, lng);
+      if (!obstacleCoordsXY || obstacleCoordsXY.length < 2) {
+        console.warn("Could not convert obstacle coordinates to XY:", feature);
+        return;
+      }
+      const [obsX, obsY] = obstacleCoordsXY;
+      const obsZ = elev;
+      // Debug: log obstacle and point-in-polygon result for DEP OIS
+      if (evaluationMode === "dep_ois") {
+        console.log("Obstacle (lat,lng,elev):", lat, lng, elev);
+        console.log("Obstacle projected (x,y):", obsX, obsY);
+        const pip = pointInPolygon([obsX, obsY], activeSurfacePolyXY);
+        console.log("Point in DEP OIS polygon?", pip);
+      }
+
+      if (pointInPolygon([obsX, obsY], activeSurfacePolyXY)) {
+        let surfElev = null;
+        if (evaluationMode === "vss") {
+          surfElev = getVSSElevationAt(obsX, obsY, activeSurfacePoly3D); // activeSurfacePoly3D is in [lat,lng,elev]
+        } else if (evaluationMode === "dep_ois") {
+          surfElev = getDepElevationAt(obsX, obsY, activeSurfacePoly3D); // Use robust function for DEP OIS
+        }
+        let remarks = "Not critical";
+        if (surfElev === null || isNaN(surfElev)) {
+          remarks = "Undetermined";
+        } else if (obsZ > surfElev) {
+          remarks = "Critical";
+        }
         results.push({
           name,
           lat,
           lng,
-          x,
-          y,
-          z,
+          x: obsX,
+          y: obsY,
+          z: obsZ,
           surfElev,
           remarks,
         });
       }
     });
 
-    if (results.length > 0 && window.showEvaluationResultsModal) {
+    if (results.length > 0) {
       window.showEvaluationResultsModal(results);
+    } else {
+      if (window.Swal) {
+        Swal.fire({
+          icon: "info",
+          title: "No Obstacles Evaluated",
+          text: "No obstacles were found within the selected surface, or surface elevation could not be determined for any obstacle inside.",
+          confirmButtonColor: "#0d6efd",
+        });
+      } else {
+        alert(
+          "No obstacles were found within the selected surface, or surface elevation could not be determined for any obstacle inside."
+        );
+      }
     }
   });
